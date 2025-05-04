@@ -1,13 +1,50 @@
-<!DOCTYPE html>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pi Market Mate</title>
   <style>
-    /* Tailwind CSS (minified, generated via Tailwind CLI) */
     *,::before,::after{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::before,::after{--tw-content:''}html,:host{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}button{background-image:none}button:focus{outline:2px solid transparent;outline-offset:2px}[type=number],[type=text]{-webkit-appearance:textfield;-moz-appearance:textfield;appearance:textfield}[type=number]::-webkit-inner-spin-button,[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.min-h-screen{min-height:100vh}.bg-blue-100{--tw-bg-opacity:1;background-color:rgb(219 234 254 / var(--tw-bg-opacity))}.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235 / var(--tw-bg-opacity))}.bg-gray-100{--tw-bg-opacity:1;background-color:rgb(243 244 246 / var(--tw-bg-opacity))}.bg-gray-300{--tw-bg-opacity:1;background-color:rgb(209 213 219 / var(--tw-bg-opacity))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity))}.w-full{width:100%}.max-w-md{max-width:28rem}.border-2{border-width:2px}.border-solid{border-style:solid}.border-dashed{border-style:dashed}.border-gray-300{--tw-border-opacity:1;border-color:rgb(209 213 219 / var(--tw-border-opacity))}.border-gray-400{--tw-border-opacity:1;border-color:rgb(156 163 175 / var(--tw-border-opacity))}.border-blue-500{--tw-border-opacity:1;border-color:rgb(59 130 246 / var(--tw-border-opacity))}.rounded-md{border-radius:0.375rem}.p-2{padding:0.5rem}.p-4{padding:1rem}.p-6{padding:1.5rem}.px-4{padding-left:1rem;padding-right:1rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.text-center{text-align:center}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-2xl{font-size:1.5rem;line-height:2rem}.font-medium{font-weight:500}.font-semibold{font-weight:600}.font-bold{font-weight:700}.text-blue-700{--tw-text-opacity:1;color:rgb(29 78 216 / var(--tw-text-opacity))}.text-gray-600{--tw-text-opacity:1;color:rgb(75 85 99 / var(--tw-text-opacity))}.text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81 / var(--tw-text-opacity))}.text-gray-800{--tw-text-opacity:1;color:rgb(31 41 55 / var(--tw-text-opacity))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38 / var(--tw-text-opacity))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity))}.shadow-lg{--tw-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000),var(--tw-ring-shadow, 0 0 #0000),var(--tw-shadow)}.hover\:bg-blue-700:hover{--tw-bg-opacity:1;background-color:rgb(29 78 216 / var(--tw-bg-opacity))}.hover\:bg-gray-400:hover{--tw-bg-opacity:1;background-color:rgb(156 163 175 / var(--tw-bg-opacity))}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}.focus\:ring-2:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow, 0 0 #0000)}.focus\:ring-blue-500:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(59 130 246 / var(--tw-ring-opacity))}.focus\:ring-gray-300:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(209 213 219 / var(--tw-ring-opacity))}.transition{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.flex{display:flex}.hidden{display:none}.items-center{align-items:center}.justify-center{justify-content:center}.space-x-4>:not([hidden])~:not([hidden]){--tw-space-x-reverse:0;margin-right:calc(1rem * calc(1 - var(--tw-space-x-reverse)));margin-left:calc(1rem * var(--tw-space-x-reverse))}.mt-1{margin-top:0.25rem}.mt-2{margin-top:0.5rem}.mt-4{margin-top:1rem}.mt-6{margin-top:1.5rem}.mb-2{margin-bottom:0.5rem}.mb-4{margin-bottom:1rem}.block{display:block}.flex-1{flex:1 1 0%}.max-h-40{max-height:10rem}.overflow-y-auto{overflow-y:auto}
-    /* Custom fade-in animation */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
@@ -21,7 +58,6 @@
   <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
     <h1 class="text-2xl font-bold text-center mb-4">Pi Market Mate</h1>
     <p class="text-center text-gray-600 mb-4">Find out how much Pi you need for a product or service using CoinGecko's official Pi price.</p>
-    <!-- Currency Selection -->
     <div class="mb-4">
       <label for="currency" class="block text-sm font-medium text-gray-700">Select Currency:</label>
       <input
@@ -226,11 +262,9 @@
         <option value="zwl">ZWL (Zimbabwe)</option>
       </datalist>
     </div>
-    <!-- Display Pi Price -->
     <div id="price-display" class="text-center mb-4">
       <p>Current Pi Price: <span id="pi-price" class="font-semibold">Fetching...</span></p>
     </div>
-    <!-- Calculation Mode Toggle -->
     <div class="mb-4">
       <label class="block text-sm font-medium text-gray-700">Calculation Mode:</label>
       <div class="flex justify-center space-x-4">
@@ -248,7 +282,6 @@
         </button>
       </div>
     </div>
-    <!-- Input Form (Dynamic Label) -->
     <div class="mb-4">
       <label id="input-label" for="amount" class="block text-sm font-medium text-gray-700">Enter Amount (USD):</label>
       <input
@@ -260,14 +293,12 @@
         class="mt-1 block w-full p-2 border-2 border-solid border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-gray-300"
       />
     </div>
-    <!-- Calculate Button -->
     <button
       id="calculate-btn"
       class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition"
     >
       Calculate
     </button>
-    <!-- Manual Price Input for Offline -->
     <div class="mt-4 mb-4 bg-gray-100 p-4 rounded-md border-dashed border-2 border-gray-400">
       <label for="manual-price" class="block text-sm font-medium text-gray-700">Manual Pi Price (Offline or Unsupported Currencies):</label>
       <input
@@ -279,7 +310,6 @@
         class="mt-1 block w-full p-2 border-2 border-solid border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-gray-300"
       />
     </div>
-    <!-- Result Display -->
     <div id="result" class="mt-6 text-center hidden bg-blue-100 p-4 rounded-md border-2 border-blue-500 animate-fadeIn">
       <p class="text-2xl font-bold text-gray-800">
         <span id="result-text-prefix"></span>
@@ -292,18 +322,15 @@
         Pay with Pi Wallet
       </button>
     </div>
-    <!-- Error Display -->
     <div id="error" class="mt-4 text-center text-red-600 hidden">
       <p id="error-message"></p>
     </div>
-    <!-- Recent Calculations -->
     <div class="mt-6">
       <h2 class="text-lg font-semibold text-center mb-2">Recent Calculations</h2>
       <ul id="recent-calculations" class="text-sm text-gray-600 max-h-40 overflow-y-auto"></ul>
     </div>
   </div>
   <script>
-    // State variables
     let currentMode = 'usd-to-pi';
     let lastPiPrices = {
       afn: null, all: null, dzd: null, eur: null, aoa: null, xcd: null, ars: null, amd: null, aud: null, azn: null,
@@ -322,11 +349,9 @@
       ugx: null, uah: null, aed: null, gbp: null, uyu: null, uzs: null, vef: null, vnd: null, yer: null, zmw: null,
       zwl: null
     };
-    let currentCurrency = 'usd';
+    let currentCurrency = localStorage.getItem('piMarketMateCurrency') || 'usd';
     let lastCalculatedPiAmount = null;
-    // Load recent calculations from localStorage
     let recentCalculations = JSON.parse(localStorage.getItem('piMarketMateCalculations')) || [];
-    // Function to fetch Pi price from CoinGecko
     async function fetchPiPrice(currency) {
       try {
         const response = await fetch(
@@ -347,13 +372,12 @@
         throw error;
       }
     }
-    // Function to update Pi price display
     async function updatePiPrice() {
       const manualPriceInput = document.getElementById('manual-price');
       try {
         const piPrice = await fetchPiPrice(currentCurrency);
         document.getElementById('pi-price').textContent = `${currentCurrency.toUpperCase()} ${piPrice.toFixed(4)}`;
-        manualPriceInput.value = piPrice.toFixed(4); // Pre-fill manual price
+        manualPriceInput.value = piPrice.toFixed(4);
       } catch (error) {
         document.getElementById('pi-price').textContent = 'Unavailable';
         if (lastPiPrices[currentCurrency]) {
@@ -362,7 +386,6 @@
         showError('Pi price unavailable. Enter a manual price below.');
       }
     }
-    // Function to get effective Pi price (manual or fetched)
     function getEffectivePiPrice() {
       const manualPrice = parseFloat(document.getElementById('manual-price').value);
       if (!isNaN(manualPrice) && manualPrice > 0) {
@@ -370,7 +393,6 @@
       }
       return lastPiPrices[currentCurrency];
     }
-    // Function to calculate amount
     function calculateAmount(amount, piPrice) {
       if (isNaN(amount) || amount <= 0) {
         showError(`Please enter a valid ${currentMode === 'usd-to-pi' ? currentCurrency.toUpperCase() : 'Pi'} amount.`);
@@ -386,7 +408,6 @@
         return (amount * piPrice).toFixed(2);
       }
     }
-    // Function to save calculation
     function saveCalculation(input, result, paid = false) {
       const calculation = {
         mode: currentMode,
@@ -397,11 +418,10 @@
         paid: paid
       };
       recentCalculations.unshift(calculation);
-      recentCalculations = recentCalculations.slice(0, 5); // Keep last 5 calculations
+      recentCalculations = recentCalculations.slice(0, 5);
       localStorage.setItem('piMarketMateCalculations', JSON.stringify(recentCalculations));
       updateRecentCalculations();
     }
-    // Function to update recent calculations display
     function updateRecentCalculations() {
       const list = document.getElementById('recent-calculations');
       list.innerHTML = '';
@@ -416,7 +436,6 @@
         list.appendChild(li);
       });
     }
-    // Function to show error message
     function showError(message) {
       const errorDiv = document.getElementById('error');
       const errorMessage = document.getElementById('error-message');
@@ -426,14 +445,12 @@
         document.getElementById('result').classList.add('hidden');
       }
     }
-    // Function to clear error message
     function clearError() {
       const errorDiv = document.getElementById('error');
       if (errorDiv) {
         errorDiv.classList.add('hidden');
       }
     }
-    // Toggle calculation mode
     function setMode(mode) {
       currentMode = mode;
       const usdToPiBtn = document.getElementById('usd-to-pi-btn');
@@ -458,12 +475,10 @@
         document.getElementById('pay-with-pi-btn').classList.add('hidden');
       }
     }
-    // Function to detect if running in Pi Browser
     function isPiBrowser() {
       const userAgent = navigator.userAgent.toLowerCase();
       return userAgent.includes('pi') || window.location.hostname.includes('app.pi');
     }
-    // Event listeners with null checks
     const usdToPiBtn = document.getElementById('usd-to-pi-btn');
     if (usdToPiBtn) {
       usdToPiBtn.addEventListener('click', () => setMode('usd-to-pi'));
@@ -474,10 +489,12 @@
     }
     const currencyInput = document.getElementById('currency');
     if (currencyInput) {
+      currencyInput.value = currentCurrency; // Set initial currency
       currencyInput.addEventListener('input', (e) => {
         const selectedCurrency = e.target.value.toLowerCase();
         if (lastPiPrices.hasOwnProperty(selectedCurrency)) {
           currentCurrency = selectedCurrency;
+          localStorage.setItem('piMarketMateCurrency', selectedCurrency); // Save to localStorage
           document.getElementById('input-label').textContent = 
             currentMode === 'usd-to-pi' ? 
             `Enter Amount (${currentCurrency.toUpperCase()}):` : 
@@ -539,7 +556,6 @@
         }
       });
     }
-    // Initialize
     setMode('usd-to-pi');
     updatePiPrice();
     updateRecentCalculations();
