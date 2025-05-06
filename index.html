@@ -492,10 +492,7 @@
       }
     }
     function isPiBrowser() {
-      const userAgent = navigator.userAgent.toLowerCase();
-      console.log('User Agent:', userAgent);
-      console.log('Hostname:', window.location.hostname);
-      // Temporarily assume pimarketmate.com is Pi Browser for testing
+      // Rely on hostname for now, as Pi Browser is working on mobile at pimarketmate.com
       return window.location.hostname.includes('pimarketmate.com');
     }
     const usdToPiBtn = document.getElementById('usd-to-pi-btn');
