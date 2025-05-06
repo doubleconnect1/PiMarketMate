@@ -493,7 +493,8 @@
     }
     function isPiBrowser() {
       const userAgent = navigator.userAgent.toLowerCase();
-      return userAgent.includes('pi') || window.location.hostname.includes('app.pi');
+      // Check for 'pi' in user agent or if hostname includes 'pimarketmate.com' (web deployment)
+      return userAgent.includes('pi') || window.location.hostname.includes('pimarketmate.com');
     }
     const usdToPiBtn = document.getElementById('usd-to-pi-btn');
     if (usdToPiBtn) {
@@ -577,7 +578,7 @@
     if (payWithPiBtn) {
       payWithPiBtn.addEventListener('click', () => {
         if (!isPiBrowser()) {
-          showError('Please open this app in the Pi Browser to pay with Pi Wallet.');
+          showError('Please open this app in Pi Browser to pay with Pi Wallet.');
           return;
         }
         if (lastCalculatedPiAmount) {
