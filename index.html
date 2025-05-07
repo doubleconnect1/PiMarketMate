@@ -147,6 +147,12 @@
       height: 500px;
       border: none;
     }
+    #pdf-fallback {
+      color: #dc2626;
+      font-size: 0.875rem;
+      text-align: center;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
@@ -407,6 +413,7 @@
   <div id="pdf-viewer">
     <button id="close-pdf" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition">Close</button>
     <div id="pdf-content"></div>
+    <p id="pdf-fallback" class="hidden">Your browser does not support inline PDF viewing. <a id="pdf-download-link" href="#" class="text-blue-600 hover:underline">Download the PDF</a> instead.</p>
   </div>
   <script>
     let currentMode = 'usd-to-pi';
@@ -662,12 +669,24 @@
     const termsOfServiceLink = document.getElementById('terms-of-service-link');
     const pdfViewer = document.getElementById('pdf-viewer');
     const pdfContent = document.getElementById('pdf-content');
+    const pdfFallback = document.getElementById('pdf-fallback');
+    const pdfDownloadLink = document.getElementById('pdf-download-link');
     const closePdfBtn = document.getElementById('close-pdf');
 
-    function displayPdf(url) {
+    function displayPdf(url, title) {
       // Create an iframe to render the PDF
-      pdfContent.innerHTML = `<iframe src="${url}" title="PDF Viewer"></iframe>`;
+      pdfContent.innerHTML = `<iframe src="${url}#toolbar=0" title="${title}"></iframe>`;
       pdfViewer.style.display = 'block';
+      pdfFallback.classList.add('hidden');
+      pdfDownloadLink.href = url;
+
+      // Check if the iframe loads successfully
+      const iframe = pdfContent.querySelector('iframe');
+      iframe.onerror = () => {
+        pdfContent.innerHTML = '';
+        pdfFallback.classList.remove('hidden');
+      };
+
       // Scroll to the viewer
       pdfViewer.scrollIntoView({ behavior: 'smooth' });
     }
@@ -675,19 +694,20 @@
     if (privacyPolicyLink) {
       privacyPolicyLink.addEventListener('click', (e) => {
         e.preventDefault();
-        displayPdf('/docs/PrivacyPolicy.pdf');
+        displayPdf('/docs/PrivacyPolicy.pdf', 'Privacy Policy');
       });
     }
     if (termsOfServiceLink) {
       termsOfServiceLink.addEventListener('click', (e) => {
         e.preventDefault();
-        displayPdf('/docs/TermsOfService.pdf');
+        displayPdf('/docs/TermsOfService.pdf', 'Terms of Service');
       });
     }
     if (closePdfBtn) {
       closePdfBtn.addEventListener('click', () => {
         pdfViewer.style.display = 'none';
         pdfContent.innerHTML = '';
+        pdfFallback.classList.add('hidden');
       });
     }
   </script>
