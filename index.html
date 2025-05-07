@@ -153,269 +153,291 @@
       text-align: center;
       margin-top: 10px;
     }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: #f3f4f6; /* Matches .bg-gray-100 */
+    }
+    td {
+      padding: 0;
+      vertical-align: top;
+      text-align: center;
+    }
+    .table-container {
+      max-width: 1000px; /* Adjusted to fit content */
+      margin: 0 auto;
+      padding: 20px;
+    }
   </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-  <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-    <h1 class="text-2xl font-bold text-center mb-4 flex items-center justify-center">
-      <img src="https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/assets/pi-logo.png" alt="Pi Network Logo" class="h-5 w-5 mr-2" />
-      Pi Market Mate
-    </h1>
-    <p class="text-center text-gray-600 mb-4">Find out how much Pi you need for a product or service using CoinGecko's official Pi price.</p>
-    <div class="mb-4">
-      <label for="currency" class="block text-sm font-bold text-gray-700">1. SELECT CURRENCY: <span id="currency-check" class="hidden text-green-500">✓</span></label>
-      <select
-        id="currency"
-        class="mt-1 block w-full p-2 border-2 border-solid border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-gray-300"
-      >
-        <option value="USD">USD (United States)</option>
-        <option value="EUR">EUR (Eurozone)</option>
-        <option value="JPY">JPY (Japan)</option>
-        <option value="GBP">GBP (United Kingdom)</option>
-        <option value="CHF">CHF (Switzerland)</option>
-        <option value="CAD">CAD (Canada)</option>
-        <option value="AUD">AUD (Australia)</option>
-        <option value="NZD">NZD (New Zealand)</option>
-        <option disabled>──────────</option>
-        <option value="AFN">AFN (Afghanistan)</option>
-        <option value="ALL">ALL (Albania)</option>
-        <option value="DZD">DZD (Algeria)</option>
-        <option value="AOA">AOA (Angola)</option>
-        <option value="XCD">XCD (Antigua and Barbuda)</option>
-        <option value="ARS">ARS (Argentina)</option>
-        <option value="AMD">AMD (Armenia)</option>
-        <option value="AZN">AZN (Azerbaijan)</option>
-        <option value="BSD">BSD (Bahamas)</option>
-        <option value="BHD">BHD (Bain)</option>
-        <option value="BDT">BDT (Bangladesh)</option>
-        <option value="BBD">BBD (Barbados)</option>
-        <option value="BYN">BYN (Belarus)</option>
-        <option value="BZD">BZD (Belize)</option>
-        <option value="XOF">XOF (Benin)</option>
-        <option value="BTN">BTN (Bhutan)</option>
-        <option value="BOB">BOB (Bolivia)</option>
-        <option value="BAM">BAM (Bosnia and Herzegovina)</option>
-        <option value="BWP">BWP (Botswana)</option>
-        <option value="BRL">BRL (Brazil)</option>
-        <option value="BND">BND (Brunei)</option>
-        <option value="BGN">BGN (Bulgaria)</option>
-        <option value="XOF">XOF (Burkina Faso)</option>
-        <option value="BIF">BIF (Burundi)</option>
-        <option value="KHR">KHR (Cambodia)</option>
-        <option value="XAF">XAF (Cameroon)</option>
-        <option value="CVE">CVE (Cape Verde)</option>
-        <option value="XAF">XAF (Central African Republic)</option>
-        <option value="XAF">XAF (Chad)</option>
-        <option value="CLP">CLP (Chile)</option>
-        <option value="CNY">CNY (China)</option>
-        <option value="COP">COP (Colombia)</option>
-        <option value="KMF">KMF (Comoros)</option>
-        <option value="CDF">CDF (Congo, Democratic Republic)</option>
-        <option value="XAF">XAF (Congo, Republic)</option>
-        <option value="CRC">CRC (Costa Rica)</option>
-        <option value="HRK">HRK (Croatia)</option>
-        <option value="CUP">CUP (Cuba)</option>
-        <option value="CZK">CZK (Czech Republic)</option>
-        <option value="DKK">DKK (Denmark)</option>
-        <option value="DJF">DJF (Djibouti)</option>
-        <option value="XCD">XCD (Dominica)</option>
-        <option value="DOP">DOP (Dominican Republic)</option>
-        <option value="USD">USD (Ecuador)</option>
-        <option value="EGP">EGP (Egypt)</option>
-        <option value="USD">USD (El Salvador)</option>
-        <option value="XAF">XAF (Equatorial Guinea)</option>
-        <option value="ERN">ERN (Eritrea)</option>
-        <option value="ETB">ETB (Ethiopia)</option>
-        <option value="FJD">FJD (Fiji)</option>
-        <option value="GMD">GMD (Gambia)</option>
-        <option value="GEL">GEL (Georgia)</option>
-        <option value="GHS">GHS (Ghana)</option>
-        <option value="GTQ">GTQ (Guatemala)</option>
-        <option value="GNF">GNF (Guinea)</option>
-        <option value="XOF">XOF (Guinea-Bissau)</option>
-        <option value="GYD">GYD (Guyana)</option>
-        <option value="HTG">HTG (Haiti)</option>
-        <option value="HNL">HNL (Honduras)</option>
-        <option value="HKD">HKD (Hong Kong)</option>
-        <option value="HUF">HUF (Hungary)</option>
-        <option value="ISK">ISK (Iceland)</option>
-        <option value="INR">INR (India)</option>
-        <option value="IDR">IDR (Indonesia)</option>
-        <option value="IRR">IRR (Iran)</option>
-        <option value="IQD">IQD (Iraq)</option>
-        <option value="ILS">ILS (Israel)</option>
-        <option value="JMD">JMD (Jamaica)</option>
-        <option value="JOD">JOD (Jordan)</option>
-        <option value="KZT">KZT (Kazakhstan)</option>
-        <option value="KES">KES (Kenya)</option>
-        <option value="KWD">KWD (Kuwait)</option>
-        <option value="KGS">KGS (Kyrgyzstan)</option>
-        <option value="LAK">LAK (Laos)</option>
-        <option value="LBP">LBP (Lebanon)</option>
-        <option value="LSL">LSL (Lesotho)</option>
-        <option value="LRD">LRD (Liberia)</option>
-        <option value="LYD">LYD (Libya)</option>
-        <option value="MGA">MGA (Madagascar)</option>
-        <option value="MWK">MWK (Malawi)</option>
-        <option value="MYR">MYR (Malaysia)</option>
-        <option value="MVR">MVR (Maldives)</option>
-        <option value="XOF">XOF (Mali)</option>
-        <option value="USD">USD (Marshall Islands)</option>
-        <option value="MRO">MRO (Mauritania)</option>
-        <option value="MUR">MUR (Mauritius)</option>
-        <option value="MXN">MXN (Mexico)</option>
-        <option value="USD">USD (Micronesia)</option>
-        <option value="MDL">MDL (Moldova)</option>
-        <option value="MNT">MNT (Mongolia)</option>
-        <option value="MAD">MAD (Morocco)</option>
-        <option value="MZN">MZN (Mozambique)</option>
-        <option value="MMK">MMK (Myanmar)</option>
-        <option value="NAD">NAD (Namibia)</option>
-        <option value="AUD">AUD (Nauru)</option>
-        <option value="NPR">NPR (Nepal)</option>
-        <option value="NIO">NIO (Nicaragua)</option>
-        <option value="XOF">XOF (Niger)</option>
-        <option value="NGN">NGN (Nigeria)</option>
-        <option value="MKD">MKD (North Macedonia)</option>
-        <option value="NOK">NOK (Norway)</option>
-        <option value="OMR">OMR (Oman)</option>
-        <option value="PKR">PKR (Pakistan)</option>
-        <option value="USD">USD (Palau)</option>
-        <option value="ILS">ILS (Palestine)</option>
-        <option value="USD">USD (Panama)</option>
-        <option value="PGK">PGK (Papua New Guinea)</option>
-        <option value="PYG">PYG (Paraguay)</option>
-        <option value="PEN">PEN (Peru)</option>
-        <option value="PHP">PHP (Philippines)</option>
-        <option value="PLN">PLN (Poland)</option>
-        <option value="QAR">QAR (Qatar)</option>
-        <option value="RON">RON (Romania)</option>
-        <option value="RUB">RUB (Russia)</option>
-        <option value="RWF">RWF (Rwanda)</option>
-        <option value="XCD">XCD (Saint Kitts and Nevis)</option>
-        <option value="XCD">XCD (Saint Lucia)</option>
-        <option value="XCD">XCD (Saint Vincent and the Grenadines)</option>
-        <option value="WST">WST (Samoa)</option>
-        <option value="STD">STD (Sao Tome and Principe)</option>
-        <option value="SAR">SAR (Saudi Arabia)</option>
-        <option value="XOF">XOF (Senegal)</option>
-        <option value="RSD">RSD (Serbia)</option>
-        <option value="SCR">SCR (Seychelles)</option>
-        <option value="SLL">SLL (Sierra Leone)</option>
-        <option value="SGD">SGD (Singapore)</option>
-        <option value="SBD">SBD (Solomon Islands)</option>
-        <option value="SOS">SOS (Somalia)</option>
-        <option value="ZAR">ZAR (South Africa)</option>
-        <option value="KRW">KRW (South Korea)</option>
-        <option value="SSP">SSP (South Sudan)</option>
-        <option value="LKR">LKR (Sri Lanka)</option>
-        <option value="SDG">SDG (Sudan)</option>
-        <option value="SRD">SRD (Suriname)</option>
-        <option value="SEK">SEK (Sweden)</option>
-        <option value="SYP">SYP (Syria)</option>
-        <option value="TWD">TWD (Taiwan)</option>
-        <option value="TJS">TJS (Tajikistan)</option>
-        <option value="TZS">TZS (Tanzania)</option>
-        <option value="THB">THB (Thailand)</option>
-        <option value="USD">USD (Timor-Leste)</option>
-        <option value="XOF">XOF (Togo)</option>
-        <option value="TOP">TOP (Tonga)</option>
-        <option value="TTD">TTD (Trinidad and Tobago)</option>
-        <option value="TND">TND (Tunisia)</option>
-        <option value="TRY">TRY (Turkey)</option>
-        <option value="TMT">TMT (Turkmenistan)</option>
-        <option value="AUD">AUD (Tuvalu)</option>
-        <option value="UGX">UGX (Uganda)</option>
-        <option value="UAH">UAH (Ukraine)</option>
-        <option value="AED">AED (United Arab Emirates)</option>
-        <option value="UYU">UYU (Uruguay)</option>
-        <option value="UZS">UZS (Uzbekistan)</option>
-        <option value="VUV">VUV (Vanuatu)</option>
-        <option value="VEF">VEF (Venezuela)</option>
-        <option value="VND">VND (Vietnam)</option>
-        <option value="YER">YER (Yemen)</option>
-        <option value="ZMW">ZMW (Zambia)</option>
-        <option value="ZWL">ZWL (Zimbabwe)</option>
-      </select>
-    </div>
-    <div id="price-display" class="text-center mb-4">
-      <p>Current Pi Price: <span id="pi-price" class="font-semibold">Fetching...</span></p>
-    </div>
-    <div class="mb-4">
-      <label class="block text-sm font-bold text-gray-700">Calculation Mode:</label>
-      <div class="flex justify-center space-x-4">
-        <button
-          id="usd-to-pi-btn"
-          class="flex-1 bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition"
-        >
-          Currency to Pi
-        </button>
-        <button
-          id="pi-to-usd-btn"
-          class="flex-1 bg-gray-300 text-gray-700 p-2 rounded-md hover:bg-gray-400 transition"
-        >
-          Pi to Currency
-        </button>
-      </div>
-    </div>
-    <div class="mb-4">
-      <label id="input-label" for="amount" class="block text-sm font-bold text-gray-700"><span id="input-label-text">2. ENTER AMOUNT (USD):</span> <span id="amount-check" class="hidden text-green-500">✓</span></label>
-      <input
-        type="number"
-        id="amount"
-        step="0.01"
-        min="0"
-        placeholder="e.g., 10000"
-        class="mt-1 block w-full p-2 border-2 border-solid border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-gray-300"
-      />
-    </div>
-    <button
-      id="calculate-btn"
-      class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition"
-    >
-      Calculate
-    </button>
-    <div class="mt-4 mb-4 bg-gray-100 p-4 rounded-md border-dashed border-2 border-gray-400">
-      <label for="manual-price" class="block text-sm font-bold text-gray-700">Manual Pi Price (Offline or Unsupported Currencies):</label>
-      <input
-        type="number"
-        id="manual-price"
-        step="0.0001"
-        min="0"
-        placeholder="Enter Pi price (e.g., 0.123)"
-        class="mt-1 block w-full p-2 border-2 border-solid border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-gray-300"
-      />
-    </div>
-    <div id="result" class="mt-6 text-center hidden bg-blue-100 p-4 rounded-md border-2 border-blue-500 animate-fadeIn">
-      <p class="text-2xl font-bold text-gray-800">
-        <span id="result-text-prefix"></span>
-        <span id="result-value" class="text-blue-700"></span>
-      </p>
-      <button
-        id="pay-with-pi-btn"
-        class="mt-4 w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition hidden"
-      >
-        Pay with Pi Wallet
-      </button>
-    </div>
-    <div id="error" class="mt-4 text-center text-red-600 hidden">
-      <p id="error-message"></p>
-    </div>
-    <div class="mt-6">
-      <h2 class="text-lg font-semibold text-center mb-2">Recent Calculations</h2>
-      <ul id="recent-calculations" class="text-sm text-gray-600 max-h-40 overflow-y-auto"></ul>
-    </div>
-  </div>
-  <footer class="mt-6 text-center text-sm text-gray-600">
-    <a href="#" id="privacy-policy-link" class="text-blue-600 hover:underline">Privacy Policy</a> |
-    <a href="#" id="terms-of-service-link" class="text-blue-600 hover:underline">Terms of Service</a>
-  </footer>
-  <div id="text-viewer">
-    <button id="close-text" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition">Close</button>
-    <div id="text-content"></div>
-    <p id="text-fallback" class="hidden">Failed to load the text content. <a id="text-download-link" href="#" class="text-blue-600 hover:underline">Download the file</a> instead.</p>
-  </div>
-  
+<body>
+  <table class="min-h-screen">
+    <tr>
+      <td>
+        <div class="table-container">
+          <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md inline-block">
+            <h1 class="text-2xl font-bold text-center mb-4 flex items-center justify-center">
+              <img src="https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/assets/pi-logo.png" alt="Pi Network Logo" class="h-5 w-5 mr-2" />
+              Pi Market Mate
+            </h1>
+            <p class="text-center text-gray-600 mb-4">Find out how much Pi you need for a product or service using CoinGecko's official Pi price.</p>
+            <div class="mb-4">
+              <label for="currency" class="block text-sm font-bold text-gray-700">1. SELECT CURRENCY: <span id="currency-check" class="hidden text-green-500">✓</span></label>
+              <select
+                id="currency"
+                class="mt-1 block w-full p-2 border-2 border-solid border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-gray-300"
+              >
+                <option value="USD">USD (United States)</option>
+                <option value="EUR">EUR (Eurozone)</option>
+                <option value="JPY">JPY (Japan)</option>
+                <option value="GBP">GBP (United Kingdom)</option>
+                <option value="CHF">CHF (Switzerland)</option>
+                <option value="CAD">CAD (Canada)</option>
+                <option value="AUD">AUD (Australia)</option>
+                <option value="NZD">NZD (New Zealand)</option>
+                <option disabled>──────────</option>
+                <option value="AFN">AFN (Afghanistan)</option>
+                <option value="ALL">ALL (Albania)</option>
+                <option value="DZD">DZD (Algeria)</option>
+                <option value="AOA">AOA (Angola)</option>
+                <option value="XCD">XCD (Antigua and Barbuda)</option>
+                <option value="ARS">ARS (Argentina)</option>
+                <option value="AMD">AMD (Armenia)</option>
+                <option value="AZN">AZN (Azerbaijan)</option>
+                <option value="BSD">BSD (Bahamas)</option>
+                <option value="BHD">BHD (Bain)</option>
+                <option value="BDT">BDT (Bangladesh)</option>
+                <option value="BBD">BBD (Barbados)</option>
+                <option value="BYN">BYN (Belarus)</option>
+                <option value="BZD">BZD (Belize)</option>
+                <option value="XOF">XOF (Benin)</option>
+                <option value="BTN">BTN (Bhutan)</option>
+                <option value="BOB">BOB (Bolivia)</option>
+                <option value="BAM">BAM (Bosnia and Herzegovina)</option>
+                <option value="BWP">BWP (Botswana)</option>
+                <option value="BRL">BRL (Brazil)</option>
+                <option value="BND">BND (Brunei)</option>
+                <option value="BGN">BGN (Bulgaria)</option>
+                <option value="XOF">XOF (Burkina Faso)</option>
+                <option value="BIF">BIF (Burundi)</option>
+                <option value="KHR">KHR (Cambodia)</option>
+                <option value="XAF">XAF (Cameroon)</option>
+                <option value="CVE">CVE (Cape Verde)</option>
+                <option value="XAF">XAF (Central African Republic)</option>
+                <option value="XAF">XAF (Chad)</option>
+                <option value="CLP">CLP (Chile)</option>
+                <option value="CNY">CNY (China)</option>
+                <option value="COP">COP (Colombia)</option>
+                <option value="KMF">KMF (Comoros)</option>
+                <option value="CDF">CDF (Congo, Democratic Republic)</option>
+                <option value="XAF">XAF (Congo, Republic)</option>
+                <option value="CRC">CRC (Costa Rica)</option>
+                <option value="HRK">HRK (Croatia)</option>
+                <option value="CUP">CUP (Cuba)</option>
+                <option value="CZK">CZK (Czech Republic)</option>
+                <option value="DKK">DKK (Denmark)</option>
+                <option value="DJF">DJF (Djibouti)</option>
+                <option value="XCD">XCD (Dominica)</option>
+                <option value="DOP">DOP (Dominican Republic)</option>
+                <option value="USD">USD (Ecuador)</option>
+                <option value="EGP">EGP (Egypt)</option>
+                <option value="USD">USD (El Salvador)</option>
+                <option value="XAF">XAF (Equatorial Guinea)</option>
+                <option value="ERN">ERN (Eritrea)</option>
+                <option value="ETB">ETB (Ethiopia)</option>
+                <option value="FJD">FJD (Fiji)</option>
+                <option value="GMD">GMD (Gambia)</option>
+                <option value="GEL">GEL (Georgia)</option>
+                <option value="GHS">GHS (Ghana)</option>
+                <option value="GTQ">GTQ (Guatemala)</option>
+                <option value="GNF">GNF (Guinea)</option>
+                <option value="XOF">XOF (Guinea-Bissau)</option>
+                <option value="GYD">GYD (Guyana)</option>
+                <option value="HTG">HTG (Haiti)</option>
+                <option value="HNL">HNL (Honduras)</option>
+                <option value="HKD">HKD (Hong Kong)</option>
+                <option value="HUF">HUF (Hungary)</option>
+                <option value="ISK">ISK (Iceland)</option>
+                <option value="INR">INR (India)</option>
+                <option value="IDR">IDR (Indonesia)</option>
+                <option value="IRR">IRR (Iran)</option>
+                <option value="IQD">IQD (Iraq)</option>
+                <option value="ILS">ILS (Israel)</option>
+                <option value="JMD">JMD (Jamaica)</option>
+                <option value="JOD">JOD (Jordan)</option>
+                <option value="KZT">KZT (Kazakhstan)</option>
+                <option value="KES">KES (Kenya)</option>
+                <option value="KWD">KWD (Kuwait)</option>
+                <option value="KGS">KGS (Kyrgyzstan)</option>
+                <option value="LAK">LAK (Laos)</option>
+                <option value="LBP">LBP (Lebanon)</option>
+                <option value="LSL">LSL (Lesotho)</option>
+                <option value="LRD">LRD (Liberia)</option>
+                <option value="LYD">LYD (Libya)</option>
+                <option value="MGA">MGA (Madagascar)</option>
+                <option value="MWK">MWK (Malawi)</option>
+                <option value="MYR">MYR (Malaysia)</option>
+                <option value="MVR">MVR (Maldives)</option>
+                <option value="XOF">XOF (Mali)</option>
+                <option value="USD">USD (Marshall Islands)</option>
+                <option value="MRO">MRO (Mauritania)</option>
+                <option value="MUR">MUR (Mauritius)</option>
+                <option value="MXN">MXN (Mexico)</option>
+                <option value="USD">USD (Micronesia)</option>
+                <option value="MDL">MDL (Moldova)</option>
+                <option value="MNT">MNT (Mongolia)</option>
+                <option value="MAD">MAD (Morocco)</option>
+                <option value="MZN">MZN (Mozambique)</option>
+                <option value="MMK">MMK (Myanmar)</option>
+                <option value="NAD">NAD (Namibia)</option>
+                <option value="AUD">AUD (Nauru)</option>
+                <option value="NPR">NPR (Nepal)</option>
+                <option value="NIO">NIO (Nicaragua)</option>
+                <option value="XOF">XOF (Niger)</option>
+                <option value="NGN">NGN (Nigeria)</option>
+                <option value="MKD">MKD (North Macedonia)</option>
+                <option value="NOK">NOK (Norway)</option>
+                <option value="OMR">OMR (Oman)</option>
+                <option value="PKR">PKR (Pakistan)</option>
+                <option value="USD">USD (Palau)</option>
+                <option value="ILS">ILS (Palestine)</option>
+                <option value="USD">USD (Panama)</option>
+                <option value="PGK">PGK (Papua New Guinea)</option>
+                <option value="PYG">PYG (Paraguay)</option>
+                <option value="PEN">PEN (Peru)</option>
+                <option value="PHP">PHP (Philippines)</option>
+                <option value="PLN">PLN (Poland)</option>
+                <option value="QAR">QAR (Qatar)</option>
+                <option value="RON">RON (Romania)</option>
+                <option value="RUB">RUB (Russia)</option>
+                <option value="RWF">RWF (Rwanda)</option>
+                <option value="XCD">XCD (Saint Kitts and Nevis)</option>
+                <option value="XCD">XCD (Saint Lucia)</option>
+                <option value="XCD">XCD (Saint Vincent and the Grenadines)</option>
+                <option value="WST">WST (Samoa)</option>
+                <option value="STD">STD (Sao Tome and Principe)</option>
+                <option value="SAR">SAR (Saudi Arabia)</option>
+                <option value="XOF">XOF (Senegal)</option>
+                <option value="RSD">RSD (Serbia)</option>
+                <option value="SCR">SCR (Seychelles)</option>
+                <option value="SLL">SLL (Sierra Leone)</option>
+                <option value="SGD">SGD (Singapore)</option>
+                <option value="SBD">SBD (Solomon Islands)</option>
+                <option value="SOS">SOS (Somalia)</option>
+                <option value="ZAR">ZAR (South Africa)</option>
+                <option value="KRW">KRW (South Korea)</option>
+                <option value="SSP">SSP (South Sudan)</option>
+                <option value="LKR">LKR (Sri Lanka)</option>
+                <option value="SDG">SDG (Sudan)</option>
+                <option value="SRD">SRD (Suriname)</option>
+                <option value="SEK">SEK (Sweden)</option>
+                <option value="SYP">SYP (Syria)</option>
+                <option value="TWD">TWD (Taiwan)</option>
+                <option value="TJS">TJS (Tajikistan)</option>
+                <option value="TZS">TZS (Tanzania)</option>
+                <option value="THB">THB (Thailand)</option>
+                <option value="USD">USD (Timor-Leste)</option>
+                <option value="XOF">XOF (Togo)</option>
+                <option value="TOP">TOP (Tonga)</option>
+                <option value="TTD">TTD (Trinidad and Tobago)</option>
+                <option value="TND">TND (Tunisia)</option>
+                <option value="TRY">TRY (Turkey)</option>
+                <option value="TMT">TMT (Turkmenistan)</option>
+                <option value="AUD">AUD (Tuvalu)</option>
+                <option value="UGX">UGX (Uganda)</option>
+                <option value="UAH">UAH (Ukraine)</option>
+                <option value="AED">AED (United Arab Emirates)</option>
+                <option value="UYU">UYU (Uruguay)</option>
+                <option value="UZS">UZS (Uzbekistan)</option>
+                <option value="VUV">VUV (Vanuatu)</option>
+                <option value="VEF">VEF (Venezuela)</option>
+                <option value="VND">VND (Vietnam)</option>
+                <option value="YER">YER (Yemen)</option>
+                <option value="ZMW">ZMW (Zambia)</option>
+                <option value="ZWL">ZWL (Zimbabwe)</option>
+              </select>
+            </div>
+            <div id="price-display" class="text-center mb-4">
+              <p>Current Pi Price: <span id="pi-price" class="font-semibold">Fetching...</span></p>
+            </div>
+            <div class="mb-4">
+              <label class="block text-sm font-bold text-gray-700">Calculation Mode:</label>
+              <div class="flex justify-center space-x-4">
+                <button
+                  id="usd-to-pi-btn"
+                  class="flex-1 bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition"
+                >
+                  Currency to Pi
+                </button>
+                <button
+                  id="pi-to-usd-btn"
+                  class="flex-1 bg-gray-300 text-gray-700 p-2 rounded-md hover:bg-gray-400 transition"
+                >
+                  Pi to Currency
+                </button>
+              </div>
+            </div>
+            <div class="mb-4">
+              <label id="input-label" for="amount" class="block text-sm font-bold text-gray-700"><span id="input-label-text">2. ENTER AMOUNT (USD):</span> <span id="amount-check" class="hidden text-green-500">✓</span></label>
+              <input
+                type="number"
+                id="amount"
+                step="0.01"
+                min="0"
+                placeholder="e.g., 10000"
+                class="mt-1 block w-full p-2 border-2 border-solid border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-gray-300"
+              />
+            </div>
+            <button
+              id="calculate-btn"
+              class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition"
+            >
+              Calculate
+            </button>
+            <div class="mt-4 mb-4 bg-gray-100 p-4 rounded-md border-dashed border-2 border-gray-400">
+              <label for="manual-price" class="block text-sm font-bold text-gray-700">Manual Pi Price (Offline or Unsupported Currencies):</label>
+              <input
+                type="number"
+                id="manual-price"
+                step="0.0001"
+                min="0"
+                placeholder="Enter Pi price (e.g., 0.123)"
+                class="mt-1 block w-full p-2 border-2 border-solid border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-gray-300"
+              />
+            </div>
+            <div id="result" class="mt-6 text-center hidden bg-blue-100 p-4 rounded-md border-2 border-blue-500 animate-fadeIn">
+              <p class="text-2xl font-bold text-gray-800">
+                <span id="result-text-prefix"></span>
+                <span id="result-value" class="text-blue-700"></span>
+              </p>
+              <button
+                id="pay-with-pi-btn"
+                class="mt-4 w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition hidden"
+              >
+                Pay with Pi Wallet
+              </button>
+            </div>
+            <div id="error" class="mt-4 text-center text-red-600 hidden">
+              <p id="error-message"></p>
+            </div>
+            <div class="mt-6">
+              <h2 class="text-lg font-semibold text-center mb-2">Recent Calculations</h2>
+              <ul id="recent-calculations" class="text-sm text-gray-600 max-h-40 overflow-y-auto"></ul>
+            </div>
+          </div>
+          <footer class="mt-6 text-center text-sm text-gray-600">
+            <a href="#" id="privacy-policy-link" class="text-blue-600 hover:underline">Privacy Policy</a> |
+            <a href="#" id="terms-of-service-link" class="text-blue-600 hover:underline">Terms of Service</a>
+          </footer>
+          <div id="text-viewer">
+            <button id="close-text" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition">Close</button>
+            <div id="text-content"></div>
+            <p id="text-fallback" class="hidden">Failed to load the text content. <a id="text-download-link" href="#" class="text-blue-600 hover:underline">Download the file</a> instead.</p>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
   <script>
     let currentMode = 'usd-to-pi';
     let lastPiPrices = {
