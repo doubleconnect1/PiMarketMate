@@ -130,7 +130,7 @@
     .animate-fadeIn {
       animation: fadeIn 0.3s ease-out;
     }
-    #pdf-viewer {
+    #text-viewer {
       display: none;
       margin-top: 20px;
       padding: 10px;
@@ -142,12 +142,12 @@
       width: 100%;
       max-width: 800px;
     }
-    #pdf-content iframe {
-      width: 100%;
-      height: 500px;
-      border: none;
+    #text-content {
+      white-space: pre-wrap;
+      font-family: 'Courier New', Courier, monospace;
+      line-height: 1.4;
     }
-    #pdf-fallback {
+    #text-fallback {
       color: #dc2626;
       font-size: 0.875rem;
       text-align: center;
@@ -410,10 +410,10 @@
     <a href="#" id="privacy-policy-link" class="text-blue-600 hover:underline">Privacy Policy</a> |
     <a href="#" id="terms-of-service-link" class="text-blue-600 hover:underline">Terms of Service</a>
   </footer>
-  <div id="pdf-viewer">
-    <button id="close-pdf" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition">Close</button>
-    <div id="pdf-content"></div>
-    <p id="pdf-fallback" class="hidden">Your browser does not support inline PDF viewing. <a id="pdf-download-link" href="#" class="text-blue-600 hover:underline">Download the PDF</a> instead.</p>
+  <div id="text-viewer">
+    <button id="close-text" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition">Close</button>
+    <div id="text-content"></div>
+    <p id="text-fallback" class="hidden">Failed to load the text content. <a id="text-download-link" href="#" class="text-blue-600 hover:underline">Download the file</a> instead.</p>
   </div>
   <script>
     let currentMode = 'usd-to-pi';
@@ -664,50 +664,48 @@
     updatePiPrice();
     updateRecentCalculations();
 
-    // PDF Viewer Functionality
+    // Text Viewer Functionality
     const privacyPolicyLink = document.getElementById('privacy-policy-link');
     const termsOfServiceLink = document.getElementById('terms-of-service-link');
-    const pdfViewer = document.getElementById('pdf-viewer');
-    const pdfContent = document.getElementById('pdf-content');
-    const pdfFallback = document.getElementById('pdf-fallback');
-    const pdfDownloadLink = document.getElementById('pdf-download-link');
-    const closePdfBtn = document.getElementById('close-pdf');
+    const textViewer = document.getElementById('text-viewer');
+    const textContent = document.getElementById('text-content');
+    const textFallback = document.getElementById('text-fallback');
+    const textDownloadLink = document.getElementById('text-download-link');
+    const closeTextBtn = document.getElementById('close-text');
 
-    function displayPdf(url, title) {
-      // Create an iframe to render the PDF
-      pdfContent.innerHTML = `<iframe src="${url}#toolbar=0" title="${title}"></iframe>`;
-      pdfViewer.style.display = 'block';
-      pdfFallback.classList.add('hidden');
-      pdfDownloadLink.href = url;
-
-      // Check if the iframe loads successfully
-      const iframe = pdfContent.querySelector('iframe');
-      iframe.onerror = () => {
-        pdfContent.innerHTML = '';
-        pdfFallback.classList.remove('hidden');
-      };
-
-      // Scroll to the viewer
-      pdfViewer.scrollIntoView({ behavior: 'smooth' });
+    async function displayText(url, title) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch text file');
+        const text = await response.text();
+        textContent.textContent = text;
+        textViewer.style.display = 'block';
+        textFallback.classList.add('hidden');
+        textDownloadLink.href = url;
+      } catch (error) {
+        textContent.textContent = '';
+        textFallback.classList.remove('hidden');
+      }
+      textViewer.scrollIntoView({ behavior: 'smooth' });
     }
 
     if (privacyPolicyLink) {
       privacyPolicyLink.addEventListener('click', (e) => {
         e.preventDefault();
-        displayPdf('/docs/PrivacyPolicy.pdf', 'Privacy Policy');
+        displayText('/docs/PrivacyPolicy.txt', 'Privacy Policy');
       });
     }
     if (termsOfServiceLink) {
       termsOfServiceLink.addEventListener('click', (e) => {
         e.preventDefault();
-        displayPdf('/docs/TermsOfService.pdf', 'Terms of Service');
+        displayText('/docs/TermsOfService.txt', 'Terms of Service');
       });
     }
-    if (closePdfBtn) {
-      closePdfBtn.addEventListener('click', () => {
-        pdfViewer.style.display = 'none';
-        pdfContent.innerHTML = '';
-        pdfFallback.classList.add('hidden');
+    if (closeTextBtn) {
+      closeTextBtn.addEventListener('click', () => {
+        textViewer.style.display = 'none';
+        textContent.textContent = '';
+        textFallback.classList.add('hidden');
       });
     }
   </script>
