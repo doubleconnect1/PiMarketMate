@@ -410,6 +410,11 @@
     <a href="#" id="privacy-policy-link" class="text-blue-600 hover:underline">Privacy Policy</a> |
     <a href="#" id="terms-of-service-link" class="text-blue-600 hover:underline">Terms of Service</a>
   </footer>
+  <div id="text-viewer">
+    <button id="close-text" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition">Close</button>
+    <div id="text-content"></div>
+    <p id="text-fallback" class="hidden">Failed to load the text content. <a id="text-download-link" href="#" class="text-blue-600 hover:underline">Download the file</a> instead.</p>
+  </div>
   
   <script>
     let currentMode = 'usd-to-pi';
