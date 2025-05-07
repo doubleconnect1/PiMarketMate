@@ -1,0 +1,34 @@
+**Terms of Service for Pi Market Mate (May 07, 2025)**
+
+**Acceptance**
+Using Pi Market Mate ("App," "we") binds you to these Terms. Refrain from use if you disagree.
+
+**Service**
+App calculates Pi currency equivalents using CoinGecko data and intends to integrate with Pi Wallet (https://wallet.pi), though sending calculated amounts is currently unavailable.
+
+**User Responsibilities**
+Use lawfully, provide accurate data, avoid disrupting app functionality.
+
+**Intellectual Property**
+App content is ours, protected by copyright. Use is for personal, non-commercial purposes only.
+
+**Payment**
+Pi Wallet integration is subject to Pi Network terms (https://mine.pi). Sending calculated amounts is not yet functional; we’re not liable for transaction failures.
+
+**Disclaimers**
+App is “as is,” with no warranties. Pi price data may fluctuate and be inaccurate. Sending to Pi Wallet is not currently supported.
+
+**Liability**
+No liability for indirect damages or calculation errors, including inability to send to Pi Wallet.
+
+**Termination**
+We may suspend access for violations; uninstall to cease use.
+
+**Governing Law**
+Governed by U.S. California law, excluding conflict principles.
+
+**Changes**
+Revised May 07, 2025. Changes notified in-app.
+
+**Contact**
+Email: support@pimarketmate.com
