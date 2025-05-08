@@ -378,6 +378,17 @@
         <h2 class="text-lg font-semibold text-center mb-2">Recent Calculations</h2>
         <ul id="recent-calculations" class="text-sm text-gray-600 max-h-40 overflow-y-auto"></ul>
       </div>
+      <div class="mt-6">
+        <label for="donation-amount" class="block text-sm font-bold text-gray-700">Custom Donation Amount (Pi):</label>
+        <input
+          type="number"
+          id="donation-amount"
+          step="0.01"
+          min="0"
+          placeholder="e.g., 10.00"
+          class="mt-1 block w-full p-2 border-2 border-solid border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-gray-300"
+        />
+      </div>
     </div>
     <footer class="mt-6 text-center text-sm text-gray-600">
       <a href="#" id="privacy-policy-link" class="text-blue-600 hover:underline">Privacy Policy</a> |
@@ -628,15 +639,18 @@
       });
     }
     const donationLink = document.getElementById('donation-link');
-    if (donationLink) {
+    const donationAmountInput = document.getElementById('donation-amount');
+    if (donationLink && donationAmountInput) {
       donationLink.addEventListener('click', (e) => {
         e.preventDefault();
         if (!isPiBrowser()) {
           showError('Please open this app in Pi Browser to make a donation.');
           return;
         }
-        if (!lastCalculatedPiAmount) {
-          showError('No valid Pi amount available for donation.');
+        const customDonationAmount = parseFloat(donationAmountInput.value);
+        const donationAmount = (!isNaN(customDonationAmount) && customDonationAmount > 0) ? customDonationAmount : lastCalculatedPiAmount;
+        if (!donationAmount || donationAmount <= 0) {
+          showError('Please enter a valid donation amount or calculate a Pi amount first.');
           return;
         }
 
@@ -646,7 +660,7 @@
           (authResponse) => {
             if (authResponse.status === 'success') {
               const paymentData = {
-                amount: parseFloat(lastCalculatedPiAmount),
+                amount: donationAmount,
                 memo: 'Donation to Pi Market Mate',
                 metadata: { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
               };
@@ -659,7 +673,7 @@
                 },
                 onReadyForServerCompletion: (paymentId, txid) => {
                   console.log('Payment completed with txid:', txid);
-                  saveCalculation(document.getElementById('amount').value, lastCalculatedPiAmount, true);
+                  saveCalculation(donationAmount, donationAmount, true);
                   showError('Donation successful! Transaction ID: ' + txid);
                   // In production, send paymentId and txid to your server endpoint (e.g., /complete-payment)
                 },
