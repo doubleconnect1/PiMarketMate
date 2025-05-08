@@ -108,6 +108,9 @@
       font-family: 'Courier New', Courier, monospace;
       line-height: 1.4;
     }
+    #text-content.left-aligned {
+      text-align: left;
+    }
     #text-fallback {
       color: #dc2626;
       font-size: 0.875rem;
@@ -664,6 +667,7 @@
           throw new Error(`${title} file is empty`);
         }
         textContent.textContent = text;
+        textContent.className = title === 'Privacy Policy' ? 'left-aligned' : '';
         textViewer.style.display = 'block';
         textFallback.classList.add('hidden');
         textDownloadLink.href = url;
