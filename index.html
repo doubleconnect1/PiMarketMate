@@ -45,36 +45,36 @@
           return cell !== '' && cell != null;
         }
         function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+          if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
             try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
+              var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+              var firstSheetName = workbook.SheetNames[0];
+              var worksheet = workbook.Sheets[firstSheetName];
 
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
+              // Convert sheet to JSON to filter blank rows
+              var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+              // Filter out blank rows (rows where all cells are empty, null, or undefined)
+              var filteredData = jsonData.filter(row => row.some(filledCell));
 
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
+              // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+              var headerRowIndex = filteredData.findIndex((row, index) =>
+                row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+              );
+              // Fallback
+              if (headerRowIndex === -1 || headerRowIndex > 25) {
+                headerRowIndex = 0;
+              }
 
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
+              // Convert filtered JSON back to CSV
+              var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+              csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+              return csv;
             } catch (e) {
-                console.error(e);
-                return "";
+              console.error(e);
+              return "";
             }
-        }
-        return gk_fileData[filename] || "";
+          }
+          return gk_fileData[filename] || "";
         }
 </script><!DOCTYPE html>
 <html lang="en">
@@ -130,6 +130,7 @@
       text-align: center;
     }
   </style>
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
 <body>
   <div class="container">
@@ -138,7 +139,7 @@
         <img src="https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/assets/pi-logo.png" alt="Pi Network Logo" class="h-5 w-5 mr-2" />
         Pi Market Mate
       </h1>
-      <p class="text-center text-gray-600 mb-4">Find out how much Pi you need for a product or service using CoinGecko's official Pi price.</p>
+      <p class="text-center text-gray-600 mb-4">Find out how much Pi you need for a product or service using CoinGecko's official Pi price. Support us with a payment!</p>
       <div class="mb-4">
         <label for="currency" class="block text-sm font-bold text-gray-700">1. SELECT CURRENCY: <span id="currency-check" class="hidden text-green-500">✓</span></label>
         <select
@@ -368,12 +369,7 @@
           <span id="result-text-prefix"></span>
           <span id="result-value" class="text-blue-700"></span>
         </p>
-        <button
-          id="pay-with-pi-btn"
-          class="mt-4 w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition hidden"
-        >
-          Pay with Pi Wallet
-        </button>
+        <a href="https://wallet.minepi.com/" id="pay-with-pi-btn" target="_blank" class="mt-4 w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition block text-center">Pay with Pi Wallet</a>
       </div>
       <div id="error" class="mt-4 text-center text-red-600 hidden">
         <p id="error-message"></p>
@@ -385,7 +381,8 @@
     </div>
     <footer class="mt-6 text-center text-sm text-gray-600">
       <a href="#" id="privacy-policy-link" class="text-blue-600 hover:underline">Privacy Policy</a> |
-      <a href="#" id="terms-of-service-link" class="text-blue-600 hover:underline">Terms of Service</a>
+      <a href="#" id="terms-of-service-link" class="text-blue-600 hover:underline">Terms of Service</a> |
+      <a href="#" id="donation-link" class="text-blue-600 hover:underline">Donation to Pi Market Mate</a>
     </footer>
     <div id="text-viewer">
       <button id="close-text" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition">Close</button>
@@ -415,6 +412,11 @@
     let currentCurrency = localStorage.getItem('piMarketMateCurrency') || 'USD';
     let lastCalculatedPiAmount = null;
     let recentCalculations = JSON.parse(localStorage.getItem('piMarketMateCalculations')) || [];
+
+    // Initialize Pi SDK
+    const Pi = window.Pi;
+    Pi.init({ version: "2.0", sandbox: false }); // Set sandbox: true for testing
+
     async function fetchPiPrice(currency) {
       try {
         const response = await fetch(
@@ -537,11 +539,10 @@
         document.getElementById('amount').value = '';
         amountCheck.classList.add('hidden');
         document.getElementById('result').classList.add('hidden');
-        document.getElementById('pay-with-pi-btn').classList.add('hidden');
       }
     }
     function isPiBrowser() {
-      return window.location.hostname.includes('pimarketmate.com');
+      return window.location.hostname.includes('pimarketmate.com') || window.location.hostname.includes('marketmate') || window.location.hostname.includes('pinet.com');
     }
     const usdToPiBtn = document.getElementById('usd-to-pi-btn');
     if (usdToPiBtn) {
@@ -602,19 +603,15 @@
             const resultTextPrefix = document.getElementById('result-text-prefix');
             const resultValue = document.getElementById('result-value');
             const resultDiv = document.getElementById('result');
-            const payWithPiBtn = document.getElementById('pay-with-pi-btn');
-            if (resultTextPrefix && resultValue && resultDiv && payWithPiBtn) {
+            if (resultTextPrefix && resultValue && resultDiv) {
               resultTextPrefix.textContent = prefix;
               resultValue.textContent = value;
               resultDiv.classList.remove('hidden');
               if (currentMode === 'usd-to-pi') {
                 lastCalculatedPiAmount = result;
-                payWithPiBtn.classList.remove('hidden');
-              } else {
-                payWithPiBtn.classList.add('hidden');
               }
-              saveCalculation(amount, result);
             }
+            saveCalculation(amount, result);
           }
         } catch (error) {
           showError('Pi price unavailable. Enter a manual price below.');
@@ -623,18 +620,65 @@
     }
     const payWithPiBtn = document.getElementById('pay-with-pi-btn');
     if (payWithPiBtn) {
-      payWithPiBtn.addEventListener('click', () => {
+      payWithPiBtn.addEventListener('click', (e) => {
         if (!isPiBrowser()) {
-          showError('Please open this app in Pi Browser to pay with Pi Wallet.');
+          e.preventDefault();
+          showError('Please open this app in Pi Browser to access Pi Wallet.');
+        }
+      });
+    }
+    const donationLink = document.getElementById('donation-link');
+    if (donationLink) {
+      donationLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!isPiBrowser()) {
+          showError('Please open this app in Pi Browser to make a donation.');
           return;
         }
-        if (lastCalculatedPiAmount) {
-          const paymentUrl = `https://wallet.pi?amount=${encodeURIComponent(lastCalculatedPiAmount)}`;
-          saveCalculation(document.getElementById('amount').value, lastCalculatedPiAmount, true);
-          window.location.href = paymentUrl;
-        } else {
-          showError('No valid Pi amount available for payment.');
+        if (!lastCalculatedPiAmount) {
+          showError('No valid Pi amount available for donation.');
+          return;
         }
+
+        // Authenticate user before payment
+        Pi.authenticate(
+          { version: "2.0", scopes: ['payments'] },
+          (authResponse) => {
+            if (authResponse.status === 'success') {
+              const paymentData = {
+                amount: parseFloat(lastCalculatedPiAmount),
+                memo: 'Donation to Pi Market Mate',
+                metadata: { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
+              };
+
+              const paymentCallbacks = {
+                onReadyForServerApproval: (paymentId) => {
+                  // Simulate server approval (replace with actual server call in production)
+                  console.log('Payment ID for approval:', paymentId);
+                  // In production, send paymentId to your server endpoint (e.g., /approve-payment)
+                },
+                onReadyForServerCompletion: (paymentId, txid) => {
+                  console.log('Payment completed with txid:', txid);
+                  saveCalculation(document.getElementById('amount').value, lastCalculatedPiAmount, true);
+                  showError('Donation successful! Transaction ID: ' + txid);
+                  // In production, send paymentId and txid to your server endpoint (e.g., /complete-payment)
+                },
+                onCancel: (paymentId) => {
+                  console.log('Payment cancelled:', paymentId);
+                  showError('Donation cancelled.');
+                },
+                onError: (error, payment) => {
+                  console.error('Payment error:', error);
+                  showError('Donation failed: ' + error.message);
+                }
+              };
+
+              Pi.createPayment(paymentData, paymentCallbacks);
+            } else {
+              showError('Authentication failed: ' + authResponse.error);
+            }
+          }
+        );
       });
     }
     setMode('usd-to-pi');
