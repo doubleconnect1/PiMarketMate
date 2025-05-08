@@ -1,34 +1,18 @@
-**Terms of Service for Pi Market Mate (May 07, 2025)**
+Pi Market Mate Terms of Service
 
-**Acceptance**
-Using Pi Market Mate ("App," "we") binds you to these Terms. Refrain from use if you disagree.
+Last Updated: May 7, 2025
 
-**Service**
-App calculates Pi currency equivalents using CoinGecko data and intends to integrate with Pi Wallet (https://wallet.pi), though sending calculated amounts is currently unavailable.
+1. Acceptance of Terms
+By using Pi Market Mate, you agree to these Terms of Service. If you do not agree, please do not use the application.
 
-**User Responsibilities**
-Use lawfully, provide accurate data, avoid disrupting app functionality.
+2. Use of Service
+Pi Market Mate allows you to convert currencies to Pi using CoinGecko's official Pi price. You are responsible for ensuring the accuracy of the data you input.
 
-**Intellectual Property**
-App content is ours, protected by copyright. Use is for personal, non-commercial purposes only.
+3. Limitation of Liability
+Pi Market Mate is provided "as is" without warranties of any kind. We are not liable for any damages arising from the use of this service.
 
-**Payment**
-Pi Wallet integration is subject to Pi Network terms (https://mine.pi). Sending calculated amounts is not yet functional; we’re not liable for transaction failures.
+4. Changes to Terms
+We may update these Terms of Service at any time. Continued use of the application after changes constitutes acceptance of the new terms.
 
-**Disclaimers**
-App is “as is,” with no warranties. Pi price data may fluctuate and be inaccurate. Sending to Pi Wallet is not currently supported.
-
-**Liability**
-No liability for indirect damages or calculation errors, including inability to send to Pi Wallet.
-
-**Termination**
-We may suspend access for violations; uninstall to cease use.
-
-**Governing Law**
-Governed by U.S. California law, excluding conflict principles.
-
-**Changes**
-Revised May 07, 2025. Changes notified in-app.
-
-**Contact**
-Email: support@pimarketmate.com
+5. Contact Us
+For questions, contact us at support@pimarketmate.com.
