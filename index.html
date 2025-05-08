@@ -76,46 +76,7 @@
         }
         return gk_fileData[filename] || "";
         }
-        </script><script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+</script><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -140,7 +101,7 @@
       max-height: 70vh;
       overflow-y: auto;
       width: 100%;
-      max-width: 800px;
+      max-width: 28rem;
     }
     #text-content {
       white-space: pre-wrap;
@@ -154,16 +115,24 @@
       margin-top: 10px;
     }
     .container {
-      max-width: 900px;
+      max-width: 28rem;
       width: 100%;
       padding: 20px;
+      text-align: center;
+    }
+    .content-wrapper {
+      width: 100%;
+    }
+    footer {
+      width: 28rem;
+      margin: 0 auto;
       text-align: center;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md inline-block">
+    <div class="content-wrapper bg-white p-6 rounded-lg shadow-lg w-full">
       <h1 class="text-2xl font-bold text-center mb-4 flex items-center justify-center">
         <img src="https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/assets/pi-logo.png" alt="Pi Network Logo" class="h-5 w-5 mr-2" />
         Pi Market Mate
@@ -571,7 +540,6 @@
       }
     }
     function isPiBrowser() {
-      // Rely on hostname for now, as Pi Browser is working on mobile at pimarketmate.com
       return window.location.hostname.includes('pimarketmate.com');
     }
     const usdToPiBtn = document.getElementById('usd-to-pi-btn');
@@ -684,14 +652,34 @@
     async function displayText(url, title) {
       try {
         const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to fetch text file');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${title} (${response.status} ${response.statusText})`);
+        }
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('text/plain')) {
+          throw new Error(`Unexpected content type for ${title}: ${contentType || 'none'}`);
+        }
         const text = await response.text();
+        if (!text || text.trim() === '') {
+          throw new Error(`${title} file is empty`);
+        }
         textContent.textContent = text;
         textViewer.style.display = 'block';
         textFallback.classList.add('hidden');
         textDownloadLink.href = url;
       } catch (error) {
+        console.error(`Error loading ${title} from ${url}:`, error.message);
+        let fallbackMessage = 'Failed to load the content. ';
+        if (error.message.includes('Failed to fetch')) {
+          fallbackMessage += `${title} may be missing or inaccessible. `;
+        } else if (error.message.includes('Unexpected content type')) {
+          fallbackMessage += `The server returned an invalid content type. `;
+        } else if (error.message.includes('file is empty')) {
+          fallbackMessage += `The ${title} file is empty. `;
+        }
+        fallbackMessage += `Please try again later or <a id="text-download-link" href="${url}" class="text-blue-600 hover:underline">download the file</a>.`;
         textContent.textContent = '';
+        textFallback.innerHTML = fallbackMessage;
         textFallback.classList.remove('hidden');
       }
       textViewer.scrollIntoView({ behavior: 'smooth' });
@@ -700,13 +688,15 @@
     if (privacyPolicyLink) {
       privacyPolicyLink.addEventListener('click', (e) => {
         e.preventDefault();
-        displayText('/docs/PrivacyPolicy.txt', 'Privacy Policy');
+        const privacyPolicyUrl = 'https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/docs/PrivacyPolicy.txt';
+        displayText(privacyPolicyUrl, 'Privacy Policy');
       });
     }
     if (termsOfServiceLink) {
       termsOfServiceLink.addEventListener('click', (e) => {
         e.preventDefault();
-        displayText('/docs/TermsOfService.txt', 'Terms of Service');
+        const termsOfServiceUrl = 'https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/docs/TermsOfService.txt';
+        displayText(termsOfServiceUrl, 'Terms of Service');
       });
     }
     if (closeTextBtn) {
