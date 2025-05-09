@@ -431,7 +431,7 @@
       if (!Pi) {
         throw new Error("Pi SDK not found");
       }
-      Pi.init({ version: "1.0", sandbox: false });
+      Pi.init({ version: "2.0", sandbox: false });
       alert("Pi SDK initialized successfully");
       if (!Pi.isReady) {
         alert("Pi SDK not ready yet");
@@ -440,25 +440,75 @@
       alert("Failed to initialize Pi SDK: " + error.message);
     }
 
-    // Function to retry SDK initialization
-    async function ensurePiSDKReady(maxRetries = 3, delayMs = 2000) {
-      let retries = 0;
-      while (retries < maxRetries) {
+    // Function to retry SDK initialization with event listener
+    async function ensurePiSDKReady(maxRetries = 3, delayMs = 2000, timeoutMs = 10000) {
+      return new Promise((resolve, reject) => {
         if (Pi.isReady) {
-          alert("Pi SDK is ready after " + retries + " retries");
-          return true;
+          alert("Pi SDK is ready on initial check");
+          resolve(true);
+          return;
         }
-        alert("Pi SDK not ready, retrying (" + (retries + 1) + "/" + maxRetries + ")...");
-        try {
-          Pi.init({ version: "1.0", sandbox: false });
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        } catch (error) {
-          alert("Retry " + (retries + 1) + " failed: " + error.message);
+
+        let retries = 0;
+        let hasResolved = false;
+
+        // Listen for SDK ready event
+        if (typeof Pi.onReady === 'function') {
+          alert("Listening for Pi SDK ready event");
+          Pi.onReady(() => {
+            if (!hasResolved) {
+              hasResolved = true;
+              alert("Pi SDK ready event triggered");
+              resolve(true);
+            }
+          });
+        } else {
+          alert("Pi SDK ready event listener not available");
         }
-        retries++;
-      }
-      alert("Failed to initialize Pi SDK after " + maxRetries + " retries");
-      return false;
+
+        // Retry loop
+        const retryInterval = setInterval(async () => {
+          if (Pi.isReady) {
+            if (!hasResolved) {
+              hasResolved = true;
+              clearInterval(retryInterval);
+              clearTimeout(timeoutTimer);
+              alert("Pi SDK is ready after " + retries + " retries");
+              resolve(true);
+            }
+            return;
+          }
+
+          if (retries >= maxRetries) {
+            clearInterval(retryInterval);
+            clearTimeout(timeoutTimer);
+            if (!hasResolved) {
+              hasResolved = true;
+              alert("Failed to initialize Pi SDK after " + maxRetries + " retries");
+              reject(new Error("Pi SDK not ready after maximum retries"));
+            }
+            return;
+          }
+
+          alert("Pi SDK not ready, retrying (" + (retries + 1) + "/" + maxRetries + ")...");
+          try {
+            Pi.init({ version: "2.0", sandbox: false });
+          } catch (error) {
+            alert("Retry " + (retries + 1) + " failed: " + error.message);
+          }
+          retries++;
+        }, delayMs);
+
+        // Timeout for the entire process
+        const timeoutTimer = setTimeout(() => {
+          if (!hasResolved) {
+            hasResolved = true;
+            clearInterval(retryInterval);
+            alert("Pi SDK initialization timed out after " + timeoutMs + "ms");
+            reject(new Error("Pi SDK initialization timed out"));
+          }
+        }, timeoutMs);
+      });
     }
 
     // Check Pi Network server availability
@@ -753,9 +803,13 @@
         }
 
         // Ensure SDK is ready with retries
-        const isReady = await ensurePiSDKReady();
-        if (!isReady) {
-          showError("Pi SDK failed to become ready. Please try again or restart the Pi Browser.");
+        try {
+          const isReady = await ensurePiSDKReady();
+          if (!isReady) {
+            throw new Error("Pi SDK failed to become ready");
+          }
+        } catch (error) {
+          showError("Pi SDK failed to become ready after retries. Please restart Pi Browser and ensure you're logged in.");
           return;
         }
 
@@ -768,15 +822,15 @@
         }
 
         alert("Entering authentication process...");
+        const scopes = ['payments'];
         const authPromise = new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error("Authentication timed out after 8 seconds"));
           }, 8000);
 
-          const scopes = ['payments'];
           alert("Calling Pi.authenticate with scopes: " + scopes.join(', '));
           Pi.authenticate(
-            { version: "1.0", scopes: scopes },
+            { version: "2.0", scopes: scopes },
             (authResponse) => {
               clearTimeout(timeout);
               alert("Authentication response received");
@@ -804,7 +858,7 @@
           const paymentCallbacks = {
             onReadyForServerApproval: (paymentId) => {
               alert("Payment ready for server approval with paymentId: " + paymentId);
-              // Simulate server approval (replace with actual server call in production)
+              // Server approval logic can be added here (e.g., API call to approve)
             },
             onReadyForServerCompletion: (paymentId, txid) => {
               alert("Payment completed with txid: " + txid);
@@ -818,6 +872,11 @@
             onError: (error, payment) => {
               alert("Payment error: " + (error.message || 'Unknown error'));
               showError('Donation failed: ' + (error.message || 'Unknown error'));
+            },
+            onIncompletePaymentFound: (payment) => {
+              alert("Incomplete payment found with paymentId: " + payment.identifier);
+              // Optional: Handle incomplete payments (e.g., complete or cancel)
+              Pi.completePayment(payment.identifier);
             }
           };
 
