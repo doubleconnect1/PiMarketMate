@@ -425,8 +425,17 @@
     let recentCalculations = JSON.parse(localStorage.getItem('piMarketMateCalculations')) || [];
 
     // Initialize Pi SDK
-    const Pi = window.Pi;
-    Pi.init({ version: "2.0", sandbox: false }); // Set sandbox: true for testing
+    let Pi;
+    try {
+      Pi = window.Pi;
+      if (!Pi) {
+        throw new Error("Pi SDK not found");
+      }
+      Pi.init({ version: "2.0", sandbox: false }); // Set sandbox: true for testing
+      alert("Pi SDK initialized successfully");
+    } catch (error) {
+      alert("Failed to initialize Pi SDK: " + error.message);
+    }
 
     async function fetchPiPrice(currency) {
       try {
@@ -444,7 +453,6 @@
         lastPiPrices[currency] = piPrice;
         return piPrice;
       } catch (error) {
-        console.warn(`Error fetching Pi price for ${currency}:`, error);
         throw error;
       }
     }
@@ -520,6 +528,7 @@
         errorDiv.classList.remove('hidden');
         document.getElementById('result').classList.add('hidden');
       }
+      alert("Error: " + message);
     }
     function clearError() {
       const errorDiv = document.getElementById('error');
@@ -553,15 +562,20 @@
       }
     }
     function isPiBrowser() {
-      return window.location.hostname.includes('pimarketmate.com') || window.location.hostname.includes('marketmate') || window.location.hostname.includes('pinet.com');
+      const hostname = window.location.hostname.toLowerCase();
+      const isPi = hostname.includes('pimarketmate.com') || hostname.includes('marketmate') || hostname.includes('pinet.com');
+      alert("Pi Browser check: " + (isPi ? "Yes" : "No") + " (Hostname: " + hostname + ")");
+      return isPi;
     }
     const usdToPiBtn = document.getElementById('usd-to-pi-btn');
     if (usdToPiBtn) {
       usdToPiBtn.addEventListener('click', () => setMode('usd-to-pi'));
+      usdToPiBtn.addEventListener('touchstart', () => setMode('usd-to-pi'));
     }
     const piToUsdBtn = document.getElementById('pi-to-usd-btn');
     if (piToUsdBtn) {
       piToUsdBtn.addEventListener('click', () => setMode('pi-to-usd'));
+      piToUsdBtn.addEventListener('touchstart', () => setMode('pi-to-usd'));
     }
     const currencySelect = document.getElementById('currency');
     const currencyCheck = document.getElementById('currency-check');
@@ -628,6 +642,36 @@
           showError('Pi price unavailable. Enter a manual price below.');
         }
       });
+      calculateBtn.addEventListener('touchstart', async () => {
+        clearError();
+        const amount = parseFloat(document.getElementById('amount').value);
+        try {
+          let piPrice = getEffectivePiPrice();
+          if (!piPrice) {
+            await fetchPiPrice(currentCurrency);
+            piPrice = getEffectivePiPrice();
+          }
+          const result = calculateAmount(amount, piPrice);
+          if (result) {
+            const prefix = currentMode === 'usd-to-pi' ? 'You need: ' : 'You get: ';
+            const value = currentMode === 'usd-to-pi' ? `${result} Pi` : `${result} ${currentCurrency}`;
+            const resultTextPrefix = document.getElementById('result-text-prefix');
+            const resultValue = document.getElementById('result-value');
+            const resultDiv = document.getElementById('result');
+            if (resultTextPrefix && resultValue && resultDiv) {
+              resultTextPrefix.textContent = prefix;
+              resultValue.textContent = value;
+              resultDiv.classList.remove('hidden');
+              if (currentMode === 'usd-to-pi') {
+                lastCalculatedPiAmount = result;
+              }
+            }
+            saveCalculation(amount, result);
+          }
+        } catch (error) {
+          showError('Pi price unavailable. Enter a manual price below.');
+        }
+      });
     }
     const payWithPiBtn = document.getElementById('pay-with-pi-btn');
     if (payWithPiBtn) {
@@ -637,31 +681,48 @@
           showError('Please open this app in Pi Browser to access Pi Wallet.');
         }
       });
+      payWithPiBtn.addEventListener('touchstart', (e) => {
+        if (!isPiBrowser()) {
+          e.preventDefault();
+          showError('Please open this app in Pi Browser to access Pi Wallet.');
+        }
+      });
     }
     const donationLink = document.getElementById('donation-link');
     const donationAmountInput = document.getElementById('donation-amount');
     if (donationLink && donationAmountInput) {
-      donationLink.addEventListener('click', (e) => {
-        console.log('Donation link clicked');
-        e.preventDefault();
-        if (!isPiBrowser()) {
-          showError('Please open this app in Pi Browser to make a donation.');
-          return;
-        }
-        const customDonationAmount = parseFloat(donationAmountInput.value);
-        const donationAmount = (!isNaN(customDonationAmount) && customDonationAmount > 0) ? customDonationAmount : lastCalculatedPiAmount;
-        if (!donationAmount || donationAmount <= 0) {
-          showError('Please enter a valid donation amount or calculate a Pi amount first.');
-          return;
-        }
-        console.log('Initiating donation with amount:', donationAmount);
+      donationLink.addEventListener('click', (e) => handleDonation(e));
+      donationLink.addEventListener('touchstart', (e) => handleDonation(e));
+    }
 
-        // Authenticate user before payment
+    function handleDonation(e) {
+      e.preventDefault();
+      alert("Donation link clicked");
+      if (!isPiBrowser()) {
+        showError('Please open this app in Pi Browser to make a donation.');
+        return;
+      }
+      const customDonationAmount = parseFloat(donationAmountInput.value);
+      const donationAmount = (!isNaN(customDonationAmount) && customDonationAmount > 0) ? customDonationAmount : lastCalculatedPiAmount;
+      if (!donationAmount || donationAmount <= 0) {
+        showError('Please enter a valid donation amount or calculate a Pi amount first.');
+        return;
+      }
+      alert("Initiating donation with amount: " + donationAmount);
+
+      if (!Pi) {
+        showError("Pi SDK is not available. Please ensure you're in the Pi Browser.");
+        return;
+      }
+
+      // Authenticate user before payment
+      try {
         Pi.authenticate(
           { version: "2.0", scopes: ['payments'] },
           (authResponse) => {
-            console.log('Authentication response:', authResponse);
+            alert("Authentication response received");
             if (authResponse.status === 'success') {
+              alert("Authentication successful");
               const paymentData = {
                 amount: donationAmount,
                 memo: 'Donation to Pi Market Mate',
@@ -670,35 +731,41 @@
 
               const paymentCallbacks = {
                 onReadyForServerApproval: (paymentId) => {
-                  console.log('Payment ready for server approval with paymentId:', paymentId);
+                  alert("Payment ready for server approval with paymentId: " + paymentId);
                   // Simulate server approval (replace with actual server call in production)
-                  // In production, send paymentId to your server endpoint (e.g., /approve-payment)
                 },
                 onReadyForServerCompletion: (paymentId, txid) => {
-                  console.log('Payment completed with txid:', txid);
+                  alert("Payment completed with txid: " + txid);
                   saveCalculation(donationAmount, donationAmount, true);
                   showError('Donation successful! Transaction ID: ' + txid);
-                  // In production, send paymentId and txid to your server endpoint (e.g., /complete-payment)
                 },
                 onCancel: (paymentId) => {
-                  console.log('Payment cancelled with paymentId:', paymentId);
+                  alert("Payment cancelled with paymentId: " + paymentId);
                   showError('Donation cancelled.');
                 },
                 onError: (error, payment) => {
-                  console.error('Payment error:', error);
+                  alert("Payment error: " + (error.message || 'Unknown error'));
                   showError('Donation failed: ' + (error.message || 'Unknown error'));
                 }
               };
 
-              console.log('Creating payment with data:', paymentData);
+              alert("Creating payment...");
               Pi.createPayment(paymentData, paymentCallbacks);
             } else {
               showError('Authentication failed: ' + (authResponse.error || 'Unknown error'));
             }
+          },
+          (error) => {
+            alert("Authentication error: " + (error.message || 'Unknown error'));
+            showError('Authentication failed: ' + (error.message || 'Unknown error'));
           }
         );
-      });
+      } catch (error) {
+        alert("Authentication exception: " + error.message);
+        showError('Authentication failed: ' + error.message);
+      }
     }
+
     setMode('usd-to-pi');
     updatePiPrice();
     updateRecentCalculations();
@@ -731,7 +798,6 @@
         textFallback.classList.add('hidden');
         textDownloadLink.href = url;
       } catch (error) {
-        console.error(`Error loading ${title} from ${url}:`, error.message);
         let fallbackMessage = 'Failed to load the content. ';
         if (error.message.includes('Failed to fetch')) {
           fallbackMessage += `${title} may be missing or inaccessible. `;
@@ -754,6 +820,11 @@
         const privacyPolicyUrl = 'https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/docs/PrivacyPolicy.txt';
         displayText(privacyPolicyUrl, 'Privacy Policy');
       });
+      privacyPolicyLink.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const privacyPolicyUrl = 'https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/docs/PrivacyPolicy.txt';
+        displayText(privacyPolicyUrl, 'Privacy Policy');
+      });
     }
     if (termsOfServiceLink) {
       termsOfServiceLink.addEventListener('click', (e) => {
@@ -761,9 +832,19 @@
         const termsOfServiceUrl = 'https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/docs/TermsOfService.txt';
         displayText(termsOfServiceUrl, 'Terms of Service');
       });
+      termsOfServiceLink.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const termsOfServiceUrl = 'https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/docs/TermsOfService.txt';
+        displayText(termsOfServiceUrl, 'Terms of Service');
+      });
     }
     if (closeTextBtn) {
       closeTextBtn.addEventListener('click', () => {
+        textViewer.style.display = 'none';
+        textContent.textContent = '';
+        textFallback.classList.add('hidden');
+      });
+      closeTextBtn.addEventListener('touchstart', () => {
         textViewer.style.display = 'none';
         textContent.textContent = '';
         textFallback.classList.add('hidden');
