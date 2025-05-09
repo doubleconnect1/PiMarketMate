@@ -431,10 +431,25 @@
       if (!Pi) {
         throw new Error("Pi SDK not found");
       }
-      Pi.init({ version: "1.0", sandbox: false }); // Disabled sandbox mode
+      Pi.init({ version: "1.0", sandbox: false });
       alert("Pi SDK initialized successfully");
+      if (!Pi.isReady) {
+        alert("Pi SDK not ready yet");
+      }
     } catch (error) {
       alert("Failed to initialize Pi SDK: " + error.message);
+    }
+
+    // Check Pi Network server availability
+    async function checkPiServer() {
+      try {
+        const response = await fetch('https://api.minepi.com/v1/health', { method: 'HEAD', timeout: 5000 });
+        alert("Pi Network server ping: " + (response.ok ? "Success" : "Failed, status: " + response.status));
+        return response.ok;
+      } catch (error) {
+        alert("Pi Network server ping failed: " + error.message);
+        return false;
+      }
     }
 
     async function fetchPiPrice(currency) {
@@ -716,11 +731,33 @@
           return;
         }
 
+        if (!Pi.isReady) {
+          alert("Pi SDK not ready. Retrying initialization...");
+          try {
+            Pi.init({ version: "1.0", sandbox: false });
+            if (!Pi.isReady) {
+              throw new Error("Pi SDK still not ready");
+            }
+            alert("Pi SDK reinitialized successfully");
+          } catch (error) {
+            alert("Failed to reinitialize Pi SDK: " + error.message);
+            return;
+          }
+        }
+
+        // Ping Pi Network server
+        alert("Checking Pi Network server availability...");
+        const serverAvailable = await checkPiServer();
+        if (!serverAvailable) {
+          showError('Pi Network servers appear unavailable. Please try again later.');
+          return;
+        }
+
         alert("Entering authentication process...");
         const authPromise = new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error("Authentication timed out after 8 seconds"));
-          }, 8000); // Increased to 8 seconds
+          }, 8000);
 
           const scopes = ['payments'];
           alert("Calling Pi.authenticate with scopes: " + scopes.join(', '));
