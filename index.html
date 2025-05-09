@@ -396,7 +396,7 @@
       <a href="#" id="donation-link" class="text-blue-600 hover:underline">Donation to Pi Market Mate</a>
     </footer>
     <div id="text-viewer">
-      <button id="close-text" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition">Close</button>
+      <button id="close-text" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-red-700 transition">Close</button>
       <div id="text-content"></div>
       <p id="text-fallback" class="hidden">Failed to load the text content. <a id="text-download-link" href="#" class="text-blue-600 hover:underline">Download the file</a> instead.</p>
     </div>
@@ -440,8 +440,42 @@
       alert("Failed to initialize Pi SDK: " + error.message);
     }
 
-    // Function to retry SDK initialization with event listener
-    async function ensurePiSDKReady(maxRetries = 3, delayMs = 2000, timeoutMs = 10000) {
+    // Function to check user login status
+    async function checkUserLogin() {
+      return new Promise((resolve, reject) => {
+        if (typeof Pi.getUserInfo !== 'function') {
+          alert("Pi.getUserInfo not available in SDK");
+          resolve(false);
+          return;
+        }
+        alert("Checking user login status...");
+        const timeout = setTimeout(() => {
+          alert("User login check timed out after 5 seconds");
+          reject(new Error("User login check timed out"));
+        }, 5000);
+
+        Pi.getUserInfo(
+          (userInfo) => {
+            clearTimeout(timeout);
+            if (userInfo && userInfo.uid) {
+              alert("User is logged in: " + userInfo.uid);
+              resolve(true);
+            } else {
+              alert("User is not logged in");
+              resolve(false);
+            }
+          },
+          (error) => {
+            clearTimeout(timeout);
+            alert("Failed to check user login: " + (error.message || 'Unknown error'));
+            reject(error);
+          }
+        );
+      });
+    }
+
+    // Function to retry SDK initialization
+    async function ensurePiSDKReady(maxRetries = 5, delayMs = 3000, timeoutMs = 20000) {
       return new Promise((resolve, reject) => {
         if (Pi.isReady) {
           alert("Pi SDK is ready on initial check");
@@ -492,7 +526,10 @@
 
           alert("Pi SDK not ready, retrying (" + (retries + 1) + "/" + maxRetries + ")...");
           try {
-            Pi.init({ version: "2.0", sandbox: false });
+            // Alternate between sandbox true/false to try different configurations
+            const sandboxMode = retries % 2 === 0;
+            Pi.init({ version: "2.0", sandbox: sandboxMode });
+            alert("Retried with sandbox: " + sandboxMode);
           } catch (error) {
             alert("Retry " + (retries + 1) + " failed: " + error.message);
           }
@@ -802,6 +839,18 @@
           return;
         }
 
+        // Check user login status
+        try {
+          const isLoggedIn = await checkUserLogin();
+          if (!isLoggedIn) {
+            showError("User not logged in. Please log in to Pi Browser and try again.");
+            return;
+          }
+        } catch (error) {
+          showError("Failed to verify user login status: " + error.message);
+          return;
+        }
+
         // Ensure SDK is ready with retries
         try {
           const isReady = await ensurePiSDKReady();
@@ -875,7 +924,6 @@
             },
             onIncompletePaymentFound: (payment) => {
               alert("Incomplete payment found with paymentId: " + payment.identifier);
-              // Optional: Handle incomplete payments (e.g., complete or cancel)
               Pi.completePayment(payment.identifier);
             }
           };
