@@ -642,6 +642,7 @@
     const donationAmountInput = document.getElementById('donation-amount');
     if (donationLink && donationAmountInput) {
       donationLink.addEventListener('click', (e) => {
+        console.log('Donation link clicked');
         e.preventDefault();
         if (!isPiBrowser()) {
           showError('Please open this app in Pi Browser to make a donation.');
@@ -653,11 +654,13 @@
           showError('Please enter a valid donation amount or calculate a Pi amount first.');
           return;
         }
+        console.log('Initiating donation with amount:', donationAmount);
 
         // Authenticate user before payment
         Pi.authenticate(
           { version: "2.0", scopes: ['payments'] },
           (authResponse) => {
+            console.log('Authentication response:', authResponse);
             if (authResponse.status === 'success') {
               const paymentData = {
                 amount: donationAmount,
@@ -667,8 +670,8 @@
 
               const paymentCallbacks = {
                 onReadyForServerApproval: (paymentId) => {
+                  console.log('Payment ready for server approval with paymentId:', paymentId);
                   // Simulate server approval (replace with actual server call in production)
-                  console.log('Payment ID for approval:', paymentId);
                   // In production, send paymentId to your server endpoint (e.g., /approve-payment)
                 },
                 onReadyForServerCompletion: (paymentId, txid) => {
@@ -678,18 +681,19 @@
                   // In production, send paymentId and txid to your server endpoint (e.g., /complete-payment)
                 },
                 onCancel: (paymentId) => {
-                  console.log('Payment cancelled:', paymentId);
+                  console.log('Payment cancelled with paymentId:', paymentId);
                   showError('Donation cancelled.');
                 },
                 onError: (error, payment) => {
                   console.error('Payment error:', error);
-                  showError('Donation failed: ' + error.message);
+                  showError('Donation failed: ' + (error.message || 'Unknown error'));
                 }
               };
 
+              console.log('Creating payment with data:', paymentData);
               Pi.createPayment(paymentData, paymentCallbacks);
             } else {
-              showError('Authentication failed: ' + authResponse.error);
+              showError('Authentication failed: ' + (authResponse.error || 'Unknown error'));
             }
           }
         );
