@@ -431,7 +431,7 @@
       if (!Pi) {
         throw new Error("Pi SDK not found");
       }
-      Pi.init({ version: "2.0", sandbox: true }); // Sandbox mode for testing
+      Pi.init({ version: "1.0", sandbox: false }); // Disabled sandbox mode
       alert("Pi SDK initialized successfully");
     } catch (error) {
       alert("Failed to initialize Pi SDK: " + error.message);
@@ -719,12 +719,13 @@
         alert("Entering authentication process...");
         const authPromise = new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
-            reject(new Error("Authentication timed out after 5 seconds"));
-          }, 5000); // Reduced to 5 seconds
+            reject(new Error("Authentication timed out after 8 seconds"));
+          }, 8000); // Increased to 8 seconds
 
-          alert("Calling Pi.authenticate...");
+          const scopes = ['payments'];
+          alert("Calling Pi.authenticate with scopes: " + scopes.join(', '));
           Pi.authenticate(
-            { version: "1.0", scopes: ['payments'] }, // Changed to version "1.0"
+            { version: "1.0", scopes: scopes },
             (authResponse) => {
               clearTimeout(timeout);
               alert("Authentication response received");
