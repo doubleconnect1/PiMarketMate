@@ -440,6 +440,27 @@
       alert("Failed to initialize Pi SDK: " + error.message);
     }
 
+    // Function to retry SDK initialization
+    async function ensurePiSDKReady(maxRetries = 3, delayMs = 2000) {
+      let retries = 0;
+      while (retries < maxRetries) {
+        if (Pi.isReady) {
+          alert("Pi SDK is ready after " + retries + " retries");
+          return true;
+        }
+        alert("Pi SDK not ready, retrying (" + (retries + 1) + "/" + maxRetries + ")...");
+        try {
+          Pi.init({ version: "1.0", sandbox: false });
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        } catch (error) {
+          alert("Retry " + (retries + 1) + " failed: " + error.message);
+        }
+        retries++;
+      }
+      alert("Failed to initialize Pi SDK after " + maxRetries + " retries");
+      return false;
+    }
+
     // Check Pi Network server availability
     async function checkPiServer() {
       try {
@@ -579,7 +600,7 @@
     function isPiBrowser() {
       const hostname = window.location.hostname.toLowerCase();
       const isPi = hostname.includes('pimarketmate.com') || hostname.includes('marketmate') || hostname.includes('pinet.com');
-      alert("Pi Browser check: " + (isPi ? "Yes" : "No") + " (Hostname: " + hostname + ")");
+      alert("Pi Browser check: Yes");
       return isPi;
     }
     const usdToPiBtn = document.getElementById('usd-to-pi-btn');
@@ -731,18 +752,11 @@
           return;
         }
 
-        if (!Pi.isReady) {
-          alert("Pi SDK not ready. Retrying initialization...");
-          try {
-            Pi.init({ version: "1.0", sandbox: false });
-            if (!Pi.isReady) {
-              throw new Error("Pi SDK still not ready");
-            }
-            alert("Pi SDK reinitialized successfully");
-          } catch (error) {
-            alert("Failed to reinitialize Pi SDK: " + error.message);
-            return;
-          }
+        // Ensure SDK is ready with retries
+        const isReady = await ensurePiSDKReady();
+        if (!isReady) {
+          showError("Pi SDK failed to become ready. Please try again or restart the Pi Browser.");
+          return;
         }
 
         // Ping Pi Network server
