@@ -431,7 +431,7 @@
       if (!Pi) {
         throw new Error("Pi SDK not found");
       }
-      Pi.init({ version: "2.0", sandbox: false }); // Set sandbox: true for testing
+      Pi.init({ version: "2.0", sandbox: true }); // Sandbox mode for testing
       alert("Pi SDK initialized successfully");
     } catch (error) {
       alert("Failed to initialize Pi SDK: " + error.message);
@@ -695,74 +695,87 @@
       donationLink.addEventListener('touchstart', (e) => handleDonation(e));
     }
 
-    function handleDonation(e) {
-      e.preventDefault();
-      alert("Donation link clicked");
-      if (!isPiBrowser()) {
-        showError('Please open this app in Pi Browser to make a donation.');
-        return;
-      }
-      const customDonationAmount = parseFloat(donationAmountInput.value);
-      const donationAmount = (!isNaN(customDonationAmount) && customDonationAmount > 0) ? customDonationAmount : lastCalculatedPiAmount;
-      if (!donationAmount || donationAmount <= 0) {
-        showError('Please enter a valid donation amount or calculate a Pi amount first.');
-        return;
-      }
-      alert("Initiating donation with amount: " + donationAmount);
-
-      if (!Pi) {
-        showError("Pi SDK is not available. Please ensure you're in the Pi Browser.");
-        return;
-      }
-
-      // Authenticate user before payment
+    async function handleDonation(e) {
       try {
-        Pi.authenticate(
-          { version: "2.0", scopes: ['payments'] },
-          (authResponse) => {
-            alert("Authentication response received");
-            if (authResponse.status === 'success') {
-              alert("Authentication successful");
-              const paymentData = {
-                amount: donationAmount,
-                memo: 'Donation to Pi Market Mate',
-                metadata: { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
-              };
+        e.preventDefault();
+        alert("Donation to Pi Market Mate clicked");
+        if (!isPiBrowser()) {
+          showError('Please open this app in Pi Browser to make a donation.');
+          return;
+        }
+        const customDonationAmount = parseFloat(donationAmountInput.value);
+        const donationAmount = (!isNaN(customDonationAmount) && customDonationAmount > 0) ? customDonationAmount : lastCalculatedPiAmount;
+        if (!donationAmount || donationAmount <= 0) {
+          showError('Please enter a valid donation amount or calculate a Pi amount first.');
+          return;
+        }
+        alert("Initiating donation with amount: " + donationAmount);
 
-              const paymentCallbacks = {
-                onReadyForServerApproval: (paymentId) => {
-                  alert("Payment ready for server approval with paymentId: " + paymentId);
-                  // Simulate server approval (replace with actual server call in production)
-                },
-                onReadyForServerCompletion: (paymentId, txid) => {
-                  alert("Payment completed with txid: " + txid);
-                  saveCalculation(donationAmount, donationAmount, true);
-                  showError('Donation successful! Transaction ID: ' + txid);
-                },
-                onCancel: (paymentId) => {
-                  alert("Payment cancelled with paymentId: " + paymentId);
-                  showError('Donation cancelled.');
-                },
-                onError: (error, payment) => {
-                  alert("Payment error: " + (error.message || 'Unknown error'));
-                  showError('Donation failed: ' + (error.message || 'Unknown error'));
-                }
-              };
+        if (!Pi) {
+          showError("Pi SDK is not available. Please ensure you're in the Pi Browser.");
+          return;
+        }
 
-              alert("Creating payment...");
-              Pi.createPayment(paymentData, paymentCallbacks);
-            } else {
-              showError('Authentication failed: ' + (authResponse.error || 'Unknown error'));
+        alert("Entering authentication process...");
+        const authPromise = new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error("Authentication timed out after 10 seconds"));
+          }, 10000); // 10-second timeout
+
+          Pi.authenticate(
+            { version: "2.0", scopes: ['payments'] },
+            (authResponse) => {
+              clearTimeout(timeout);
+              alert("Authentication response received");
+              resolve(authResponse);
+            },
+            (error) => {
+              clearTimeout(timeout);
+              alert("Authentication error callback triggered: " + (error.message || 'Unknown error'));
+              reject(error);
             }
-          },
-          (error) => {
-            alert("Authentication error: " + (error.message || 'Unknown error'));
-            showError('Authentication failed: ' + (error.message || 'Unknown error'));
-          }
-        );
+          );
+        });
+
+        alert("Starting authentication...");
+        const authResponse = await authPromise;
+
+        if (authResponse.status === 'success') {
+          alert("Authentication successful");
+          const paymentData = {
+            amount: donationAmount,
+            memo: 'Donation to Pi Market Mate',
+            metadata: { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
+          };
+
+          const paymentCallbacks = {
+            onReadyForServerApproval: (paymentId) => {
+              alert("Payment ready for server approval with paymentId: " + paymentId);
+              // Simulate server approval (replace with actual server call in production)
+            },
+            onReadyForServerCompletion: (paymentId, txid) => {
+              alert("Payment completed with txid: " + txid);
+              saveCalculation(donationAmount, donationAmount, true);
+              showError('Donation successful! Transaction ID: ' + txid);
+            },
+            onCancel: (paymentId) => {
+              alert("Payment cancelled with paymentId: " + paymentId);
+              showError('Donation cancelled.');
+            },
+            onError: (error, payment) => {
+              alert("Payment error: " + (error.message || 'Unknown error'));
+              showError('Donation failed: ' + (error.message || 'Unknown error'));
+            }
+          };
+
+          alert("Creating payment...");
+          Pi.createPayment(paymentData, paymentCallbacks);
+        } else {
+          showError('Authentication failed: ' + (authResponse.error || 'Unknown error'));
+        }
       } catch (error) {
-        alert("Authentication exception: " + error.message);
-        showError('Authentication failed: ' + error.message);
+        alert("Error in handleDonation: " + error.message);
+        showError('An error occurred during donation: ' + error.message);
       }
     }
 
