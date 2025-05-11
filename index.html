@@ -369,7 +369,12 @@
           <span id="result-text-prefix"></span>
           <span id="result-value" class="text-blue-700"></span>
         </p>
-        <a href="https://wallet.minepi.com/" id="pay-with-pi-btn" target="_blank" class="mt-4 w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition block text-center">Pay with Pi Wallet</a>
+        <button
+          id="pay-with-pi-btn"
+          class="mt-4 w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition"
+        >
+          Pay with Pi
+        </button>
       </div>
       <div id="error" class="mt-4 text-center text-red-600 hidden">
         <p id="error-message"></p>
@@ -396,7 +401,7 @@
       <a href="#" id="donation-link" class="text-blue-600 hover:underline">Donation to Pi Market Mate</a>
     </footer>
     <div id="text-viewer">
-      <button id="close-text" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-red-700 transition">Close</button>
+      <button id="close-text" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition">Close</button>
       <div id="text-content"></div>
       <p id="text-fallback" class="hidden">Failed to load the text content. <a id="text-download-link" href="#" class="text-blue-600 hover:underline">Download the file</a> instead.</p>
     </div>
@@ -558,6 +563,26 @@
         alert("Pi Network server ping failed: " + error.message);
         return false;
       }
+    }
+
+    // Simulate server-side approval (in production, this should be a backend API call)
+    async function simulateServerApproval(paymentId) {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          alert("Simulated server approval for paymentId: " + paymentId);
+          resolve(true);
+        }, 1000);
+      });
+    }
+
+    // Simulate server-side completion (in production, this should be a backend API call)
+    async function simulateServerCompletion(paymentId, txid) {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          alert("Simulated server completion for paymentId: " + paymentId + ", txid: " + txid);
+          resolve(true);
+        }, 1000);
+      });
     }
 
     async function fetchPiPrice(currency) {
@@ -756,7 +781,7 @@
               resultValue.textContent = value;
               resultDiv.classList.remove('hidden');
               if (currentMode === 'usd-to-pi') {
-                lastCalculatedPiAmount = result;
+                lastCalculatedPiAmount = parseFloat(result);
               }
             }
             saveCalculation(amount, result);
@@ -786,7 +811,7 @@
               resultValue.textContent = value;
               resultDiv.classList.remove('hidden');
               if (currentMode === 'usd-to-pi') {
-                lastCalculatedPiAmount = result;
+                lastCalculatedPiAmount = parseFloat(result);
               }
             }
             saveCalculation(amount, result);
@@ -796,43 +821,13 @@
         }
       });
     }
-    const payWithPiBtn = document.getElementById('pay-with-pi-btn');
-    if (payWithPiBtn) {
-      payWithPiBtn.addEventListener('click', (e) => {
-        if (!isPiBrowser()) {
-          e.preventDefault();
-          showError('Please open this app in Pi Browser to access Pi Wallet.');
-        }
-      });
-      payWithPiBtn.addEventListener('touchstart', (e) => {
-        if (!isPiBrowser()) {
-          e.preventDefault();
-          showError('Please open this app in Pi Browser to access Pi Wallet.');
-        }
-      });
-    }
-    const donationLink = document.getElementById('donation-link');
-    const donationAmountInput = document.getElementById('donation-amount');
-    if (donationLink && donationAmountInput) {
-      donationLink.addEventListener('click', (e) => handleDonation(e));
-      donationLink.addEventListener('touchstart', (e) => handleDonation(e));
-    }
 
-    async function handleDonation(e) {
+    async function initiatePayment(amount, memo, metadata) {
       try {
-        e.preventDefault();
-        alert("Donation to Pi Market Mate clicked");
         if (!isPiBrowser()) {
-          showError('Please open this app in Pi Browser to make a donation.');
+          showError('Please open this app in Pi Browser to make a payment.');
           return;
         }
-        const customDonationAmount = parseFloat(donationAmountInput.value);
-        const donationAmount = (!isNaN(customDonationAmount) && customDonationAmount > 0) ? customDonationAmount : lastCalculatedPiAmount;
-        if (!donationAmount || donationAmount <= 0) {
-          showError('Please enter a valid donation amount or calculate a Pi amount first.');
-          return;
-        }
-        alert("Initiating donation with amount: " + donationAmount);
 
         if (!Pi) {
           showError("Pi SDK is not available. Please ensure you're in the Pi Browser.");
@@ -896,47 +891,134 @@
         alert("Starting authentication...");
         const authResponse = await authPromise;
 
-        if (authResponse.status === 'success') {
-          alert("Authentication successful");
-          const paymentData = {
-            amount: donationAmount,
-            memo: 'Donation to Pi Market Mate',
-            metadata: { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
-          };
-
-          const paymentCallbacks = {
-            onReadyForServerApproval: (paymentId) => {
-              alert("Payment ready for server approval with paymentId: " + paymentId);
-              // Server approval logic can be added here (e.g., API call to approve)
-            },
-            onReadyForServerCompletion: (paymentId, txid) => {
-              alert("Payment completed with txid: " + txid);
-              saveCalculation(donationAmount, donationAmount, true);
-              showError('Donation successful! Transaction ID: ' + txid);
-            },
-            onCancel: (paymentId) => {
-              alert("Payment cancelled with paymentId: " + paymentId);
-              showError('Donation cancelled.');
-            },
-            onError: (error, payment) => {
-              alert("Payment error: " + (error.message || 'Unknown error'));
-              showError('Donation failed: ' + (error.message || 'Unknown error'));
-            },
-            onIncompletePaymentFound: (payment) => {
-              alert("Incomplete payment found with paymentId: " + payment.identifier);
-              Pi.completePayment(payment.identifier);
-            }
-          };
-
-          alert("Creating payment...");
-          Pi.createPayment(paymentData, paymentCallbacks);
-        } else {
+        if (authResponse.status !== 'success') {
           showError('Authentication failed: ' + (authResponse.error || 'Unknown error'));
+          return;
         }
+
+        alert("Authentication successful");
+        const paymentData = {
+          amount: amount,
+          memo: memo,
+          metadata: metadata
+        };
+
+        const paymentCallbacks = {
+          onReadyForServerApproval: async (paymentId) => {
+            alert("Payment ready for server approval with paymentId: " + paymentId);
+            try {
+              const approved = await simulateServerApproval(paymentId);
+              if (!approved) {
+                throw new Error("Server approval failed");
+              }
+              alert("Server approval simulated successfully");
+            } catch (error) {
+              showError("Server approval failed: " + error.message);
+            }
+          },
+          onReadyForServerCompletion: async (paymentId, txid) => {
+            alert("Payment ready for server completion with paymentId: " + paymentId + ", txid: " + txid);
+            try {
+              const completed = await simulateServerCompletion(paymentId, txid);
+              if (!completed) {
+                throw new Error("Server completion failed");
+              }
+              alert("Payment completed with txid: " + txid);
+              saveCalculation(amount, amount, true);
+              showError('Payment successful! Transaction ID: ' + txid);
+            } catch (error) {
+              showError("Server completion failed: " + error.message);
+            }
+          },
+          onCancel: (paymentId) => {
+            alert("Payment cancelled with paymentId: " + paymentId);
+            showError('Payment cancelled by user.');
+          },
+          onError: (error, payment) => {
+            alert("Payment error: " + (error.message || 'Unknown error'));
+            if (error.message.includes("User cancelled")) {
+              showError('Payment cancelled by user.');
+            } else if (error.message.includes("Insufficient balance")) {
+              showError('Insufficient Pi balance to complete the payment.');
+            } else {
+              showError('Payment failed: ' + (error.message || 'Unknown error'));
+            }
+          },
+          onIncompletePaymentFound: (payment) => {
+            alert("Incomplete payment found with paymentId: " + payment.identifier);
+            Pi.completePayment(payment.identifier, (result) => {
+              if (result.status === 'success') {
+                alert("Incomplete payment completed successfully");
+              } else {
+                alert("Failed to complete incomplete payment: " + (result.error || 'Unknown error'));
+              }
+            });
+          }
+        };
+
+        alert("Creating payment...");
+        Pi.createPayment(paymentData, paymentCallbacks);
       } catch (error) {
-        alert("Error in handleDonation: " + error.message);
-        showError('An error occurred during donation: ' + error.message);
+        alert("Error in initiatePayment: " + error.message);
+        showError('An error occurred during payment: ' + error.message);
       }
+    }
+
+    const payWithPiBtn = document.getElementById('pay-with-pi-btn');
+    if (payWithPiBtn) {
+      payWithPiBtn.addEventListener('click', () => {
+        if (!isPiBrowser()) {
+          showError('Please open this app in Pi Browser to make a payment.');
+          return;
+        }
+        if (currentMode !== 'usd-to-pi' || !lastCalculatedPiAmount) {
+          showError('Please calculate a Pi amount first using "Currency to Pi" mode.');
+          return;
+        }
+        initiatePayment(
+          lastCalculatedPiAmount,
+          'Payment for calculated amount via Pi Market Mate',
+          { app: 'Pi Market Mate', type: 'calculated_payment' }
+        );
+      });
+      payWithPiBtn.addEventListener('touchstart', () => {
+        if (!isPiBrowser()) {
+          showError('Please open this app in Pi Browser to make a payment.');
+          return;
+        }
+        if (currentMode !== 'usd-to-pi' || !lastCalculatedPiAmount) {
+          showError('Please calculate a Pi amount first using "Currency to Pi" mode.');
+          return;
+        }
+        initiatePayment(
+          lastCalculatedPiAmount,
+          'Payment for calculated amount via Pi Market Mate',
+          { app: 'Pi Market Mate', type: 'calculated_payment' }
+        );
+      });
+    }
+
+    const donationLink = document.getElementById('donation-link');
+    const donationAmountInput = document.getElementById('donation-amount');
+    if (donationLink && donationAmountInput) {
+      donationLink.addEventListener('click', (e) => handleDonation(e));
+      donationLink.addEventListener('touchstart', (e) => handleDonation(e));
+    }
+
+    async function handleDonation(e) {
+      e.preventDefault();
+      alert("Donation to Pi Market Mate clicked");
+      const customDonationAmount = parseFloat(donationAmountInput.value);
+      const donationAmount = (!isNaN(customDonationAmount) && customDonationAmount > 0) ? customDonationAmount : lastCalculatedPiAmount;
+      if (!donationAmount || donationAmount <= 0) {
+        showError('Please enter a valid donation amount or calculate a Pi amount first.');
+        return;
+      }
+      initiatePayment(
+        donationAmount,
+        'Donation to Pi Market Mate',
+        { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
+      );
     }
 
     setMode('usd-to-pi');
