@@ -600,26 +600,6 @@
       }
     }
 
-    // Simulate server-side approval (in production, this should be a backend API call)
-    async function simulateServerApproval(paymentId) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          alert("Simulated server approval for paymentId: " + paymentId);
-          resolve(true);
-        }, 1000);
-      });
-    }
-
-    // Simulate server-side completion (in production, this should be a backend API call)
-    async function simulateServerCompletion(paymentId, txid) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          alert("Simulated server completion for paymentId: " + paymentId + ", txid: " + txid);
-          resolve(true);
-        }, 1000);
-      });
-    }
-
     async function fetchPiPrice(currency) {
       try {
         const response = await fetch(
@@ -868,11 +848,7 @@
           showError('Please calculate a Pi amount first using "Currency to Pi" mode.');
           return;
         }
-        initiatePayment(
-          lastCalculatedPiAmount,
-          'Payment for calculated amount via Pi Market Mate',
-          { app: 'Pi Market Mate', type: 'calculated_payment' }
-        );
+        initiatePayment(lastCalculatedPiAmount, 'Payment for calculated amount via Pi Market Mate', { app: 'Pi Market Mate', type: 'calculated_payment' });
       });
       payWithPiBtn.addEventListener('touchstart', () => {
         if (!isPiBrowser()) {
@@ -883,11 +859,7 @@
           showError('Please calculate a Pi amount first using "Currency to Pi" mode.');
           return;
         }
-        initiatePayment(
-          lastCalculatedPiAmount,
-          'Payment for calculated amount via Pi Market Mate',
-          { app: 'Pi Market Mate', type: 'calculated_payment' }
-        );
+        initiatePayment(lastCalculatedPiAmount, 'Payment for calculated amount via Pi Market Mate', { app: 'Pi Market Mate', type: 'calculated_payment' });
       });
     }
 
@@ -934,103 +906,72 @@
           return;
         }
 
-        alert("Entering authentication process...");
-        const scopes = ['payments'];
-        const authPromise = new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error("Authentication timed out after 8 seconds"));
-          }, 8000);
-
-          alert("Calling Pi.authenticate with scopes: " + scopes.join(', '));
-          Pi.authenticate(
-            { version: "2.0", scopes: scopes },
-            (authResponse) => {
-              clearTimeout(timeout);
-              alert("Authentication response received");
-              resolve(authResponse);
-            },
-            (error) => {
-              clearTimeout(timeout);
-              alert("Authentication error callback triggered: " + (error.message || 'Unknown error'));
-              reject(error);
-            }
-          );
-        });
-
-        alert("Starting authentication...");
-        const authResponse = await authPromise;
-
-        if (authResponse.status !== 'success') {
-          showError('Authentication failed: ' + (authResponse.error || 'Unknown error'));
-          return;
-        }
-
-        alert("Authentication successful");
-        const paymentData = {
+        alert("Initiating payment for " + amount + " Pi...");
+        const payment = await Pi.createPayment({
           amount: amount,
           memo: memo,
           metadata: metadata
-        };
+        });
 
-        const paymentCallbacks = {
-          onReadyForServerApproval: async (paymentId) => {
-            alert("Payment ready for server approval with paymentId: " + paymentId);
-            try {
-              const approved = await simulateServerApproval(paymentId);
-              if (!approved) {
-                throw new Error("Server approval failed");
-              }
-              alert("Server approval simulated successfully");
-            } catch (error) {
-              showError("Server approval failed: " + error.message);
-            }
-          },
-          onReadyForServerCompletion: async (paymentId, txid) => {
-            alert("Payment ready for server completion with paymentId: " + paymentId + ", txid: " + txid);
-            try {
-              const completed = await simulateServerCompletion(paymentId, txid);
-              if (!completed) {
-                throw new Error("Server completion failed");
-              }
-              alert("Payment completed with txid: " + txid);
-              saveCalculation(amount, amount, true);
-              showError('Payment successful! Transaction ID: ' + txid);
-            } catch (error) {
-              showError("Server completion failed: " + error.message);
-            }
-          },
-          onCancel: (paymentId) => {
-            alert("Payment cancelled with paymentId: " + paymentId);
+        payment.then(async (paymentResult) => {
+          alert("Payment approved by user, paymentId: " + paymentResult.identifier);
+          // Simulate sending to backend
+          await simulateSendToBackend(paymentResult.identifier);
+        }).catch((error) => {
+          alert("Payment failed: " + (error.message || 'Unknown error'));
+          if (error.message.includes("User cancelled")) {
             showError('Payment cancelled by user.');
-          },
-          onError: (error, payment) => {
-            alert("Payment error: " + (error.message || 'Unknown error'));
-            if (error.message.includes("User cancelled")) {
-              showError('Payment cancelled by user.');
-            } else if (error.message.includes("Insufficient balance")) {
-              showError('Insufficient Pi balance to complete the payment.');
-            } else {
-              showError('Payment failed: ' + (error.message || 'Unknown error'));
-            }
-          },
-          onIncompletePaymentFound: (payment) => {
-            alert("Incomplete payment found with paymentId: " + payment.identifier);
-            Pi.completePayment(payment.identifier, (result) => {
-              if (result.status === 'success') {
-                alert("Incomplete payment completed successfully");
-              } else {
-                alert("Failed to complete incomplete payment: " + (result.error || 'Unknown error'));
-              }
-            });
+          } else if (error.message.includes("Insufficient balance")) {
+            showError('Insufficient Pi balance to complete the payment.');
+          } else {
+            showError('Payment failed: ' + (error.message || 'Unknown error'));
           }
-        };
-
-        alert("Creating payment...");
-        Pi.createPayment(paymentData, paymentCallbacks);
+        });
       } catch (error) {
         alert("Error in initiatePayment: " + error.message);
         showError('An error occurred during payment: ' + error.message);
       }
+    }
+
+    // Simulate backend verification and completion
+    async function simulateSendToBackend(paymentId) {
+      try {
+        alert("Simulating backend verification for paymentId: " + paymentId);
+        const status = await simulateVerifyPayment(paymentId);
+        if (status === 'pending') {
+          alert("Payment is pending, simulating completion...");
+          await simulateCompletePayment(paymentId);
+        } else if (status === 'completed') {
+          alert("Payment already completed");
+          showError('Payment successful! Transaction completed.');
+        } else {
+          alert("Payment status: " + status);
+          showError('Payment ' + status + '.');
+        }
+      } catch (error) {
+        alert("Backend simulation failed: " + error.message);
+        showError('Failed to verify/complete payment: ' + error.message);
+      }
+    }
+
+    async function simulateVerifyPayment(paymentId) {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve('pending'); // Simulate pending status
+        }, 1000);
+      });
+    }
+
+    async function simulateCompletePayment(paymentId) {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const txid = 'TX' + Math.random().toString(36).substr(2, 9);
+          alert("Payment completed with txid: " + txid);
+          saveCalculation(paymentId, paymentId, true);
+          showError('Payment successful! Transaction ID: ' + txid);
+          resolve(txid);
+        }, 1000);
+      });
     }
 
     const donationLink = document.getElementById('donation-link');
@@ -1070,11 +1011,7 @@
         }
         donationPopup.classList.remove('active');
         overlay.classList.remove('active');
-        initiatePayment(
-          selectedAmount,
-          'Donation to Pi Market Mate',
-          { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
-        );
+        initiatePayment(selectedAmount, 'Donation to Pi Market Mate', { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' });
       });
       confirmDonationBtn.addEventListener('touchstart', async () => {
         const selectedAmount = parseFloat(donationAmountSelect.value);
@@ -1084,11 +1021,7 @@
         }
         donationPopup.classList.remove('active');
         overlay.classList.remove('active');
-        initiatePayment(
-          selectedAmount,
-          'Donation to Pi Market Mate',
-          { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
-        );
+        initiatePayment(selectedAmount, 'Donation to Pi Market Mate', { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' });
       });
     }
 
