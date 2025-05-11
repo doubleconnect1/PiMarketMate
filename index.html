@@ -129,6 +129,36 @@
       margin: 0 auto;
       text-align: center;
     }
+    #donation-popup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: white;
+      padding: 20px;
+      border-radius: 0.375rem;
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+      z-index: 1000;
+      width: 90%;
+      max-width: 300px;
+    }
+    #donation-popup.active {
+      display: block;
+    }
+    #overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+    }
+    #overlay.active {
+      display: block;
+    }
   </style>
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
@@ -383,17 +413,6 @@
         <h2 class="text-lg font-semibold text-center mb-2">Recent Calculations</h2>
         <ul id="recent-calculations" class="text-sm text-gray-600 max-h-40 overflow-y-auto"></ul>
       </div>
-      <div class="mt-6">
-        <label for="donation-amount" class="block text-sm font-bold text-gray-700">Custom Donation Amount (Pi):</label>
-        <input
-          type="number"
-          id="donation-amount"
-          step="0.01"
-          min="0"
-          placeholder="e.g., 10.00"
-          class="mt-1 block w-full p-2 border-2 border-solid border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-gray-300"
-        />
-      </div>
     </div>
     <footer class="mt-6 text-center text-sm text-gray-600">
       <a href="#" id="privacy-policy-link" class="text-blue-600 hover:underline">Privacy Policy</a> |
@@ -404,6 +423,22 @@
       <button id="close-text" class="bg-red-600 text-white p-2 rounded-md hover:bg-red-700 transition">Close</button>
       <div id="text-content"></div>
       <p id="text-fallback" class="hidden">Failed to load the text content. <a id="text-download-link" href="#" class="text-blue-600 hover:underline">Download the file</a> instead.</p>
+    </div>
+    <div id="overlay"></div>
+    <div id="donation-popup">
+      <h3 class="text-lg font-semibold mb-2">Select Donation Amount</h3>
+      <select id="donation-amount-select" class="w-full p-2 border-2 border-gray-300 rounded-md mb-4">
+        <option value="1">1 Pi</option>
+        <option value="2">2 Pi</option>
+        <option value="3">3 Pi</option>
+        <option value="4">4 Pi</option>
+        <option value="5">5 Pi</option>
+        <option value="10">10 Pi</option>
+        <option value="20">20 Pi</option>
+        <option value="30">30 Pi</option>
+      </select>
+      <button id="confirm-donation" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition">Confirm</button>
+      <button id="cancel-donation" class="mt-2 w-full bg-gray-300 text-gray-700 p-2 rounded-md hover:bg-gray-400 transition">Cancel</button>
     </div>
   </div>
   <script>
@@ -822,6 +857,40 @@
       });
     }
 
+    const payWithPiBtn = document.getElementById('pay-with-pi-btn');
+    if (payWithPiBtn) {
+      payWithPiBtn.addEventListener('click', () => {
+        if (!isPiBrowser()) {
+          showError('Please open this app in Pi Browser to make a payment.');
+          return;
+        }
+        if (currentMode !== 'usd-to-pi' || !lastCalculatedPiAmount) {
+          showError('Please calculate a Pi amount first using "Currency to Pi" mode.');
+          return;
+        }
+        initiatePayment(
+          lastCalculatedPiAmount,
+          'Payment for calculated amount via Pi Market Mate',
+          { app: 'Pi Market Mate', type: 'calculated_payment' }
+        );
+      });
+      payWithPiBtn.addEventListener('touchstart', () => {
+        if (!isPiBrowser()) {
+          showError('Please open this app in Pi Browser to make a payment.');
+          return;
+        }
+        if (currentMode !== 'usd-to-pi' || !lastCalculatedPiAmount) {
+          showError('Please calculate a Pi amount first using "Currency to Pi" mode.');
+          return;
+        }
+        initiatePayment(
+          lastCalculatedPiAmount,
+          'Payment for calculated amount via Pi Market Mate',
+          { app: 'Pi Market Mate', type: 'calculated_payment' }
+        );
+      });
+    }
+
     async function initiatePayment(amount, memo, metadata) {
       try {
         if (!isPiBrowser()) {
@@ -964,61 +1033,74 @@
       }
     }
 
-    const payWithPiBtn = document.getElementById('pay-with-pi-btn');
-    if (payWithPiBtn) {
-      payWithPiBtn.addEventListener('click', () => {
-        if (!isPiBrowser()) {
-          showError('Please open this app in Pi Browser to make a payment.');
-          return;
-        }
-        if (currentMode !== 'usd-to-pi' || !lastCalculatedPiAmount) {
-          showError('Please calculate a Pi amount first using "Currency to Pi" mode.');
-          return;
-        }
-        initiatePayment(
-          lastCalculatedPiAmount,
-          'Payment for calculated amount via Pi Market Mate',
-          { app: 'Pi Market Mate', type: 'calculated_payment' }
-        );
-      });
-      payWithPiBtn.addEventListener('touchstart', () => {
-        if (!isPiBrowser()) {
-          showError('Please open this app in Pi Browser to make a payment.');
-          return;
-        }
-        if (currentMode !== 'usd-to-pi' || !lastCalculatedPiAmount) {
-          showError('Please calculate a Pi amount first using "Currency to Pi" mode.');
-          return;
-        }
-        initiatePayment(
-          lastCalculatedPiAmount,
-          'Payment for calculated amount via Pi Market Mate',
-          { app: 'Pi Market Mate', type: 'calculated_payment' }
-        );
-      });
-    }
-
     const donationLink = document.getElementById('donation-link');
-    const donationAmountInput = document.getElementById('donation-amount');
-    if (donationLink && donationAmountInput) {
-      donationLink.addEventListener('click', (e) => handleDonation(e));
-      donationLink.addEventListener('touchstart', (e) => handleDonation(e));
+    const donationPopup = document.getElementById('donation-popup');
+    const overlay = document.getElementById('overlay');
+    const confirmDonationBtn = document.getElementById('confirm-donation');
+    const cancelDonationBtn = document.getElementById('cancel-donation');
+    const donationAmountSelect = document.getElementById('donation-amount-select');
+
+    if (donationLink) {
+      donationLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!isPiBrowser()) {
+          showError('Please open this app in Pi Browser to make a donation.');
+          return;
+        }
+        donationPopup.classList.add('active');
+        overlay.classList.add('active');
+      });
+      donationLink.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (!isPiBrowser()) {
+          showError('Please open this app in Pi Browser to make a donation.');
+          return;
+        }
+        donationPopup.classList.add('active');
+        overlay.classList.add('active');
+      });
     }
 
-    async function handleDonation(e) {
-      e.preventDefault();
-      alert("Donation to Pi Market Mate clicked");
-      const customDonationAmount = parseFloat(donationAmountInput.value);
-      const donationAmount = (!isNaN(customDonationAmount) && customDonationAmount > 0) ? customDonationAmount : lastCalculatedPiAmount;
-      if (!donationAmount || donationAmount <= 0) {
-        showError('Please enter a valid donation amount or calculate a Pi amount first.');
-        return;
-      }
-      initiatePayment(
-        donationAmount,
-        'Donation to Pi Market Mate',
-        { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
-      );
+    if (confirmDonationBtn) {
+      confirmDonationBtn.addEventListener('click', async () => {
+        const selectedAmount = parseFloat(donationAmountSelect.value);
+        if (isNaN(selectedAmount) || selectedAmount <= 0) {
+          showError('Please select a valid donation amount.');
+          return;
+        }
+        donationPopup.classList.remove('active');
+        overlay.classList.remove('active');
+        initiatePayment(
+          selectedAmount,
+          'Donation to Pi Market Mate',
+          { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
+        );
+      });
+      confirmDonationBtn.addEventListener('touchstart', async () => {
+        const selectedAmount = parseFloat(donationAmountSelect.value);
+        if (isNaN(selectedAmount) || selectedAmount <= 0) {
+          showError('Please select a valid donation amount.');
+          return;
+        }
+        donationPopup.classList.remove('active');
+        overlay.classList.remove('active');
+        initiatePayment(
+          selectedAmount,
+          'Donation to Pi Market Mate',
+          { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' }
+        );
+      });
+    }
+
+    if (cancelDonationBtn) {
+      cancelDonationBtn.addEventListener('click', () => {
+        donationPopup.classList.remove('active');
+        overlay.classList.remove('active');
+      });
+      cancelDonationBtn.addEventListener('touchstart', () => {
+        donationPopup.classList.remove('active');
+        overlay.classList.remove('active');
+      });
     }
 
     setMode('usd-to-pi');
