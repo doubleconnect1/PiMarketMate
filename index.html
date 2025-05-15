@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pi Market Mate Demo</title>
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: sans-serif; background: #f8fafc; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh;}
+    .container { background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 8px 24px #0002; max-width: 350px; width: 100%; }
+    .title { font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; text-align: center;}
+    .input-block { margin-bottom: 1.2rem;}
+    label { display: block; margin-bottom: .3rem; }
+    input, select { width: 100%; padding: .6rem; border-radius: 5px; border: 1px solid #ddd;}
+    button { width: 100%; padding: .8rem; font-size: 1rem; background: #3b82f6; color: #fff; border: none; border-radius: 6px; cursor: pointer;}
+    button:disabled { background: #a3a3a3;}
+    .msg { margin-top: 1rem; color: #dc2626; text-align: center;}
+    .success { color: #16a34a;}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="title">Pi Market Mate 결제 Demo</div>
+  <div class="input-block">
+    <label for="amount">지불할 금액 (예: 10 Pi)</label>
+    <input id="amount" type="number" min="0.01" step="0.01" placeholder="예: 10">
+  </div>
+  <button id="payBtn">Pay with Pi</button>
+  <div id="msg" class="msg"></div>
+</div>
+<script>
+function isPiBrowser() {
+  return /pi-browser/i.test(navigator.userAgent);
+}
+
+let Pi;
+window.addEventListener("DOMContentLoaded", () => {
+  Pi = window.Pi;
+  const payBtn = document.getElementById('payBtn');
+  const msg = document.getElementById('msg');
+  payBtn.onclick = async () => {
+    msg.textContent = "";
+    const amount = parseFloat(document.getElementById('amount').value);
+    if (!amount || amount <= 0) {
+      msg.textContent = "지불할 Pi 수량을 입력하세요.";
+      return;
+    }
+    if (!isPiBrowser()) {
+      msg.textContent = "Pi Browser에서만 결제 가능합니다!";
+      return;
+    }
+    if (!Pi || typeof Pi.createPayment !== 'function') {
+      msg.textContent = "Pi SDK가 올바르게 로딩되지 않았습니다.";
+      return;
+    }
+
+    try {
+      // 인증(필요시)
+      await new Promise((resolve, reject) => {
+        Pi.authenticate({ version: "2.0", scopes: ["payments"] }, resolve, reject);
+      });
+      // 결제창 호출
+      Pi.createPayment(
+        {
+          amount,
+          memo: "Pi Market Mate 결제",
+          metadata: { source: "marketmate", type: "payment" }
+        },
+        {
+          onReadyForServerApproval: paymentId => {
+            // 즉시 승인(실서비스는 서버에서 검증)
+            Pi.approvePayment(paymentId, true);
+          },
+          onReadyForServerCompletion: (paymentId, txid) => {
+            Pi.completePayment(paymentId, true);
+            msg.textContent = "결제가 성공적으로 완료되었습니다! (TXID: " + txid + ")";
+            msg.className = "msg success";
+          },
+          onCancel: paymentId => {
+            msg.textContent = "결제가 취소되었습니다.";
+            msg.className = "msg";
+          },
+          onError: (error, payment) => {
+            msg.textContent = "결제 오류: " + (error.message || error);
+            msg.className = "msg";
+          }
+        }
+      );
+    } catch (err) {
+      msg.textContent = "인증 또는 결제 오류: " + (err.message || err);
+      msg.className = "msg";
+    }
+  }
+});
+</script>
+</body>
+</html>
