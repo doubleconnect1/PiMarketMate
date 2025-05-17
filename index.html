@@ -42,7 +42,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Pi Market Mate Payment</title>
-  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+  <script src="https://sdk.minepi.com/pi-sdk-2.0.0.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
@@ -186,6 +186,7 @@
       } catch (err) {
         msg.textContent = 'Failed to initialize Pi SDK: ' + (err.message || err);
         msg.className = 'msg';
+        console.error('Initialization error:', err);
         return;
       }
 
@@ -204,11 +205,22 @@
 
         try {
           // Authenticate user
+          console.log('Attempting authentication with scopes: ["payments"]');
           await new Promise((resolve, reject) => {
-            Pi.authenticate({ version: '2.0', scopes: ['payments'] }, resolve).catch(reject);
+            Pi.authenticate(
+              { version: '2.0', scopes: ['payments'] },
+              (authResult) => {
+                console.log('Authentication successful:', authResult);
+                resolve(authResult);
+              }
+            ).catch((err) => {
+              console.error('Authentication error:', err);
+              reject(err);
+            });
           });
 
           // Create payment
+          console.log('Creating payment with amount:', amount);
           Pi.createPayment(
             {
               amount,
@@ -217,6 +229,7 @@
             },
             {
               onReadyForServerApproval: async (paymentId) => {
+                console.log('onReadyForServerApproval called with paymentId:', paymentId);
                 try {
                   const response = await fetch('https://your-server.com/api/approve', {
                     method: 'POST',
@@ -234,9 +247,11 @@
                 } catch (err) {
                   msg.textContent = 'Approval error: ' + err.message;
                   msg.className = 'msg';
+                  console.error('Approval error:', err);
                 }
               },
               onReadyForServerCompletion: async (paymentId, txid) => {
+                console.log('onReadyForServerCompletion called with paymentId:', paymentId, 'txid:', txid);
                 try {
                   const response = await fetch('https://your-server.com/api/complete', {
                     method: 'POST',
@@ -252,21 +267,25 @@
                 } catch (err) {
                   msg.textContent = 'Completion error: ' + err.message;
                   msg.className = 'msg';
+                  console.error('Completion error:', err);
                 }
               },
               onCancel: (paymentId) => {
                 msg.textContent = 'Payment was canceled.';
                 msg.className = 'msg';
+                console.log('Payment canceled:', paymentId);
               },
               onError: (error, payment) => {
                 msg.textContent = 'Payment error: ' + (error.message || error);
                 msg.className = 'msg';
+                console.error('Payment error:', error, 'Payment:', payment);
               },
             }
           );
         } catch (err) {
           msg.textContent = 'Authentication or payment error: ' + (err.message || err);
           msg.className = 'msg';
+          console.error('Error during payment process:', err);
         }
       };
     });
