@@ -120,7 +120,9 @@
     }
     .user-agent {
       margin-top: 1.5rem;
-      font-size: 0.85rem;
+      font-size: 0.85
+
+rem;
       color: #4b5563;
       background: #f3f4f6;
       padding: 0.75rem;
@@ -257,19 +259,20 @@
         return;
       }
 
-      const appId = 'marketmate'; // Replace with your actual appId from Pi Developer Portal
+      const appId = 'marketmate'; // Verified as correct from Pi Developer Portal
 
       try {
         console.log('Initializing Pi SDK with appId:', appId);
         await Pi.init({
           version: '2.0',
           appId: appId,
-          sandbox: true, // Set to false for Mainnet
+          sandbox: true, // Matches Testnet configuration
         });
         msg.textContent = 'Pi SDK initialized successfully.';
         msg.className = 'msg success';
         payBtn.disabled = false;
         console.log('Pi SDK initialized successfully:', Pi);
+        console.log('Reminder: Ensure sandbox is authorized for https://www.pimarketmate.com in Pi Mining App > Pi Utilities > Authorize Sandbox');
       } catch (err) {
         msg.textContent = 'Failed to initialize Pi SDK: ' + (err.message || err);
         msg.className = 'msg';
@@ -278,7 +281,7 @@
       }
 
       payBtn.onclick = async () => {
-        console.log('Pay button clicked');
+        console.log('Pay button clicked - entering handler');
         msg.textContent = '';
         msg.className = 'msg';
         const amountInput = document.getElementById('amount').value;
@@ -313,11 +316,10 @@
             {
               amount,
               memo: 'Pi Market Mate Payment',
-              metadata: { source: 'marketmate', type: 'payment' },
             },
             {
               onReadyForServerApproval: async (paymentId) => {
-                console.log('onReadyForServerApproval called with paymentId:', paymentId);
+                console.log('onReadyForServerApproval called with dealerpaymentId:', paymentId);
                 // For testing: Bypass server call to trigger Pi Wallet
                 console.log('Bypassing server approval for testing');
                 Pi.approvePayment(paymentId, true);
@@ -392,6 +394,7 @@
           msg.className = 'msg';
           console.error('Error during payment process:', err);
         }
+        console.log('Pay button handler completed');
       };
     });
   </script>
