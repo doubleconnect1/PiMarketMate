@@ -42,7 +42,6 @@
 <head>
   <meta charset="UTF-8">
   <title>Pi Market Mate Payment</title>
-  <script src="https://sdk.minepi.com/pi-sdk-2.0.0.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
@@ -155,12 +154,51 @@
     }
 
     let Pi;
-    window.addEventListener('DOMContentLoaded', async () => {
-      Pi = window.Pi;
-      const payBtn = document.getElementById('payBtn');
+    let sdkLoadAttempts = 0;
+    const maxAttempts = 2;
+    const sdkUrls = [
+      'https://sdk.minepi.com/pi-sdk.js?v=1', // Latest with cache bust
+      'https://sdk.minepi.com/pi-sdk-2.0.0.js?v=1' // Fallback
+    ];
+
+    function loadSdk(url) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.async = true;
+        script.onload = () => {
+          console.log('SDK loaded from:', url);
+          resolve();
+        };
+        script.onerror = () => {
+          console.error('Failed to load SDK from:', url);
+          reject(new Error('SDK load failed'));
+        };
+        document.head.appendChild(script);
+      });
+    }
+
+    async function initializeSdk() {
       const msg = document.getElementById('msg');
       const uaBlock = document.getElementById('userAgentBlock');
       const ua = navigator.userAgent;
+
+      while (sdkLoadAttempts < maxAttempts) {
+        try {
+          await loadSdk(sdkUrls[sdkLoadAttempts]);
+          Pi = window.Pi;
+          break;
+        } catch (err) {
+          sdkLoadAttempts++;
+          if (sdkLoadAttempts >= maxAttempts) {
+            msg.textContent = 'Failed to load Pi SDK after multiple attempts.';
+            msg.className = 'msg';
+            uaBlock.innerHTML = "<span class='no'>❌ Pi SDK Not Loaded (Please Use Pi Browser or Check Network)</span><br><b>User Agent:</b> " + ua;
+            console.error('All SDK load attempts failed:', err);
+            return false;
+          }
+        }
+      }
 
       // Check if Pi SDK is loaded
       let browserStatus = isPiBrowser()
@@ -170,19 +208,40 @@
 
       if (!isPiBrowser()) {
         msg.textContent = 'Please open this page in Pi Browser.';
+        return false;
+      }
+
+      return true;
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const payBtn = document.getElementById('payBtn');
+      const msg = document.getElementById('msg');
+
+      // Load and initialize SDK
+      const sdkLoaded = await initializeSdk();
+      if (!sdkLoaded) return;
+
+      // Validate appId
+      const appId = 'YOUR_APP_ID'; // Replace with your Pi Developer Portal appId
+      if (appId === 'YOUR_APP_ID') {
+        msg.textContent = 'Error: Please set a valid appId in the script.';
+        msg.className = 'msg';
         return;
       }
 
       // Initialize Pi SDK
       try {
+        console.log('Initializing Pi SDK with appId:', appId);
         await Pi.init({
           version: '2.0',
-          appId: 'YOUR_APP_ID', // Replace with your Pi Developer Portal appId
+          appId: appId,
           sandbox: true, // Set to false for Mainnet
         });
         msg.textContent = 'Pi SDK initialized successfully.';
         msg.className = 'msg success';
         payBtn.disabled = false; // Enable payment button
+        console.log('Pi SDK initialized:', Pi);
       } catch (err) {
         msg.textContent = 'Failed to initialize Pi SDK: ' + (err.message || err);
         msg.className = 'msg';
@@ -205,10 +264,10 @@
 
         try {
           // Authenticate user
-          console.log('Attempting authentication with scopes: ["payments"]');
+          console.log('Attempting authentication with scopes:', ['payments']);
           await new Promise((resolve, reject) => {
             Pi.authenticate(
-              { version: '2.0', scopes: ['payments'] },
+              { scopes: ['payments'] },
               (authResult) => {
                 console.log('Authentication successful:', authResult);
                 resolve(authResult);
