@@ -1,110 +1,257 @@
-<!DOCTYPE html>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Pi Market Mate 결제 Demo</title>
+  <title>Pi Market Mate Payment</title>
   <script src="https://sdk.minepi.com/pi-sdk.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: sans-serif; background: #f8fafc; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh;}
-    .container { background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 8px 24px #0002; max-width: 350px; width: 100%; }
-    .title { font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; text-align: center;}
-    .input-block { margin-bottom: 1.2rem;}
-    label { display: block; margin-bottom: .3rem; }
-    input, select { width: 100%; padding: .6rem; border-radius: 5px; border: 1px solid #ddd;}
-    button { width: 100%; padding: .8rem; font-size: 1rem; background: #3b82f6; color: #fff; border: none; border-radius: 6px; cursor: pointer;}
-    button:disabled { background: #a3a3a3;}
-    .msg { margin-top: 1rem; color: #dc2626; text-align: center;}
-    .success { color: #16a34a;}
-    .user-agent { margin-top: 1.5rem; font-size: 0.95em; color: #555; word-break: break-all; background: #f3f4f6; padding: 0.7rem; border-radius: 6px;}
-    .yes { color: #16a34a; font-weight:bold;}
-    .no { color: #dc2626; font-weight:bold;}
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      max-width: 400px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .title {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      text-align: center;
+      color: #1e293b;
+    }
+    .input-block {
+      margin-bottom: 1.5rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+      color: #374151;
+    }
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    button {
+      width: 100%;
+      padding: 0.9rem;
+      font-size: 1.1rem;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    .msg {
+      margin-top: 1rem;
+      font-size: 0.95rem;
+      text-align: center;
+      color: #dc2626;
+    }
+    .success {
+      color: #16a34a;
+    }
+    .user-agent {
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      color: #4b5563;
+      background: #f3f4f6;
+      padding: 0.75rem;
+      border-radius: 8px;
+      word-break: break-all;
+    }
+    .yes {
+      color: #16a34a;
+      font-weight: bold;
+    }
+    .no {
+      color: #dc2626;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
-<div class="container">
-  <div class="title">Pi Market Mate 결제 Demo</div>
-  <div class="input-block">
-    <label for="amount">지불할 금액 (예: 10 Pi)</label>
-    <input id="amount" type="number" min="0.01" step="0.01" placeholder="예: 10">
+  <div class="container">
+    <div class="title">Pi Market Mate Payment</div>
+    <div class="input-block">
+      <label for="amount">Payment Amount (e.g., 10 Pi)</label>
+      <input id="amount" type="number" min="0.01" step="0.01" placeholder="e.g., 10" />
+    </div>
+    <button id="payBtn">Pay with Pi Wallet</button>
+    <div id="msg" class="msg"></div>
+    <div id="userAgentBlock" class="user-agent"></div>
   </div>
-  <button id="payBtn">Pay with Pi</button>
-  <div id="msg" class="msg"></div>
-  <div id="userAgentBlock" class="user-agent"></div>
-</div>
-<script>
-function isPiBrowser() {
-  // Pi SDK가 로드되어 있으면 브라우저 종류와 상관없이 OK로 간주
-  return (typeof window.Pi !== "undefined");
-}
-
-let Pi;
-window.addEventListener("DOMContentLoaded", () => {
-  Pi = window.Pi;
-  const payBtn = document.getElementById('payBtn');
-  const msg = document.getElementById('msg');
-  const uaBlock = document.getElementById('userAgentBlock');
-  const ua = navigator.userAgent;
-
-  let browserStatus = isPiBrowser() 
-      ? "<span class='yes'>✅ Pi SDK가 로드되었습니다. (Pi Browser 가능)</span>"
-      : "<span class='no'>❌ Pi SDK가 없습니다. 결제 불가 (Pi Browser인지 확인)</span>";
-  uaBlock.innerHTML = browserStatus + "<br><b>userAgent:</b> " + ua;
-
-  payBtn.onclick = async () => {
-    msg.textContent = "";
-    msg.className = "msg";
-    const amount = parseFloat(document.getElementById('amount').value);
-    if (!amount || amount <= 0) {
-      msg.textContent = "지불할 Pi 수량을 입력하세요.";
-      return;
-    }
-    if (!isPiBrowser()) {
-      msg.textContent = "Pi SDK가 로드되지 않아 결제 불가! (Pi Browser에서 접속하세요)";
-      return;
-    }
-    if (!Pi || typeof Pi.createPayment !== 'function') {
-      msg.textContent = "Pi SDK가 올바르게 로딩되지 않았습니다.";
-      return;
+  <script>
+    function isPiBrowser() {
+      return typeof window.Pi !== 'undefined';
     }
 
-    try {
-      // 인증(필요시)
-      await new Promise((resolve, reject) => {
-        Pi.authenticate({ version: "2.0", scopes: ["payments"] }, resolve, reject);
-      });
-      // 결제창 호출
-      Pi.createPayment(
-        {
-          amount,
-          memo: "Pi Market Mate 결제",
-          metadata: { source: "marketmate", type: "payment" }
-        },
-        {
-          onReadyForServerApproval: paymentId => {
-            Pi.approvePayment(paymentId, true);
-          },
-          onReadyForServerCompletion: (paymentId, txid) => {
-            Pi.completePayment(paymentId, true);
-            msg.textContent = "결제가 성공적으로 완료되었습니다! (TXID: " + txid + ")";
-            msg.className = "msg success";
-          },
-          onCancel: paymentId => {
-            msg.textContent = "결제가 취소되었습니다.";
-            msg.className = "msg";
-          },
-          onError: (error, payment) => {
-            msg.textContent = "결제 오류: " + (error.message || error);
-            msg.className = "msg";
-          }
+    let Pi;
+    window.addEventListener('DOMContentLoaded', () => {
+      Pi = window.Pi;
+      const payBtn = document.getElementById('payBtn');
+      const msg = document.getElementById('msg');
+      const uaBlock = document.getElementById('userAgentBlock');
+      const ua = navigator.userAgent;
+
+      let browserStatus = isPiBrowser()
+        ? "<span class='yes'>✅ Pi SDK Loaded (Pi Browser Ready)</span>"
+        : "<span class='no'>❌ Pi SDK Not Loaded (Please Use Pi Browser)</span>";
+      uaBlock.innerHTML = browserStatus + "<br><b>User Agent:</b> " + ua;
+
+      payBtn.onclick = async () => {
+        msg.textContent = '';
+        msg.className = 'msg';
+        const amount = parseFloat(document.getElementById('amount').value);
+        if (!amount || amount <= 0) {
+          msg.textContent = 'Please enter a valid Pi amount.';
+          return;
         }
-      );
-    } catch (err) {
-      msg.textContent = "인증 또는 결제 오류: " + (err.message || err);
-      msg.className = "msg";
-    }
-  }
-});
-</script>
+        if (!isPiBrowser()) {
+          msg.textContent = 'Pi SDK not loaded! Please use Pi Browser.';
+          return;
+        }
+        if (!Pi || typeof Pi.createPayment !== 'function') {
+          msg.textContent = 'Pi SDK failed to load correctly.';
+          return;
+        }
+
+        try {
+          // Authenticate user
+          await new Promise((resolve, reject) => {
+            Pi.authenticate({ version: '2.0', scopes: ['payments'] }, resolve).catch(reject);
+          });
+
+          // Create payment
+          Pi.createPayment(
+            {
+              amount,
+              memo: 'Pi Market Mate Payment',
+              metadata: { source: 'marketmate', type: 'payment' },
+            },
+            {
+              onReadyForServerApproval: async (paymentId) => {
+                try {
+                  const response = await fetch('https://your-server.com/api/approve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      paymentId,
+                      amount,
+                      memo: 'Pi Market Mate Payment',
+                    }),
+                  });
+                  if (!response.ok) {
+                    throw new Error('Server approval failed');
+                  }
+                  Pi.approvePayment(paymentId, true);
+                } catch (err) {
+                  msg.textContent = 'Approval error: ' + err.message;
+                  msg.className = 'msg';
+                }
+              },
+              onReadyForServerCompletion: async (paymentId, txid) => {
+                try {
+                  const response = await fetch('https://your-server.com/api/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paymentId, txid }),
+                  });
+                  if (!response.ok) {
+                    throw new Error('Server completion failed');
+                  }
+                  Pi.completePayment(paymentId, true);
+                  msg.textContent = 'Payment completed successfully! (TXID: ' + txid + ')';
+                  msg.className = 'msg success';
+                } catch (err) {
+                  msg.textContent = 'Completion error: ' + err.message;
+                  msg.className = 'msg';
+                }
+              },
+              onCancel: (paymentId) => {
+                msg.textContent = 'Payment was canceled.';
+                msg.className = 'msg';
+              },
+              onError: (error, payment) => {
+                msg.textContent = 'Payment error: ' + (error.message || error);
+                msg.className = 'msg';
+              },
+            }
+          );
+        } catch (err) {
+          msg.textContent = 'Authentication or payment error: ' + (err.message || err);
+          msg.className = 'msg';
+        }
+      };
+    });
+  </script>
 </body>
 </html>
