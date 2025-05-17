@@ -161,23 +161,15 @@
           var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
           var firstSheetName = workbook.SheetNames[0];
           var worksheet = workbook.Sheets[firstSheetName];
-
-          // Convert sheet to JSON to filter blank rows
           var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-          // Filter out blank rows (rows where all cells are empty, null, or undefined)
           var filteredData = jsonData.filter(row => row.some(filledCell));
-
-          // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
           var headerRowIndex = filteredData.findIndex((row, index) =>
             row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
           );
-          // Fallback
           if (headerRowIndex === -1 || headerRowIndex > 25) {
             headerRowIndex = 0;
           }
-
-          // Convert filtered JSON back to CSV
-          var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+          var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
           csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
           return csv;
         } catch (e) {
@@ -207,7 +199,7 @@
         script.src = url;
         script.async = true;
         script.onload = () => {
-          console.log('SDK loaded from:', url);
+          console.log('SDK loaded successfully from:', url);
           resolve();
         };
         script.onerror = () => {
@@ -227,6 +219,7 @@
         try {
           await loadSdk(sdkUrls[sdkLoadAttempts]);
           Pi = window.Pi;
+          console.log('Pi SDK assigned:', Pi);
           break;
         } catch (err) {
           sdkLoadAttempts++;
@@ -240,14 +233,14 @@
         }
       }
 
-      // Check if Pi SDK is loaded
       let browserStatus = isPiBrowser()
-        ? "<span class='no'>✅ Pi SDK Loaded (Pi Browser Ready)</span>"
+        ? "<span class='yes'>✅ Pi SDK Loaded (Pi Browser Ready)</span>"
         : "<span class='no'>❌ Pi SDK Not Loaded (Please Use Pi Browser)</span>";
       uaBlock.innerHTML = browserStatus + "<br><b>User Agent:</b> " + ua;
 
       if (!isPiBrowser()) {
         msg.textContent = 'Please open this page in Pi Browser.';
+        console.error('Pi Browser not detected');
         return false;
       }
 
@@ -258,14 +251,14 @@
       const payBtn = document.getElementById('payBtn');
       const msg = document.getElementById('msg');
 
-      // Load and initialize SDK
       const sdkLoaded = await initializeSdk();
-      if (!sdkLoaded) return;
+      if (!sdkLoaded) {
+        console.error('SDK initialization failed');
+        return;
+      }
 
-      // Set appId
-      const appId = 'marketmate'; // Your appId from Pi Developer Portal
+      const appId = 'marketmate'; // Replace with your actual appId from Pi Developer Portal
 
-      // Initialize Pi SDK
       try {
         console.log('Initializing Pi SDK with appId:', appId);
         await Pi.init({
@@ -275,41 +268,45 @@
         });
         msg.textContent = 'Pi SDK initialized successfully.';
         msg.className = 'msg success';
-        payBtn.disabled = false; // Enable payment button
-        console.log('Pi SDK initialized:', Pi);
+        payBtn.disabled = false;
+        console.log('Pi SDK initialized successfully:', Pi);
       } catch (err) {
         msg.textContent = 'Failed to initialize Pi SDK: ' + (err.message || err);
         msg.className = 'msg';
-        console.error('Initialization error:', err);
+        console.error('Pi SDK initialization error:', err);
         return;
       }
 
       payBtn.onclick = async () => {
         msg.textContent = '';
         msg.className = 'msg';
-        const amount = parseFloat(document.getElementById('amount').value);
-        if (!amount || amount <= 0) {
-          msg.textContent = 'Please enter a valid Pi amount.';
+        const amountInput = document.getElementById('amount').value;
+        const amount = parseFloat(amountInput);
+        console.log('Payment button clicked with amount:', amount);
+
+        if (!amount || amount <= 0 || isNaN(amount)) {
+          msg.textContent = 'Please enter a valid Pi amount (e.g., 10).';
+          console.error('Invalid amount entered:', amountInput);
           return;
         }
+
         if (!Pi || typeof Pi.createPayment !== 'function') {
           msg.textContent = 'Pi SDK is not properly loaded.';
+          console.error('Pi SDK not loaded or createPayment missing');
           return;
         }
 
         try {
-          // Authenticate user
-          console.log('Attempting authentication with scopes:', ['payments']);
+          console.log('Authenticating with scopes:', ['payments']);
           const auth = await Pi.authenticate(
             ['payments'],
             (payment) => {
               console.log('Incomplete payment found:', payment);
-              // TODO: Handle incomplete payment (e.g., complete on server)
+              // TODO: Handle incomplete payment by sending to your server
             }
           );
           console.log('Authentication successful:', auth);
 
-          // Create payment
           console.log('Creating payment with amount:', amount);
           Pi.createPayment(
             {
@@ -321,6 +318,7 @@
               onReadyForServerApproval: async (paymentId) => {
                 console.log('onReadyForServerApproval called with paymentId:', paymentId);
                 try {
+                  // Replace with your actual server endpoint
                   const response = await fetch('https://your-server.com/api/approve', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -331,8 +329,9 @@
                     }),
                   });
                   if (!response.ok) {
-                    throw new Error('Server approval failed');
+                    throw new Error('Server approval failed: ' + response.statusText);
                   }
+                  console.log('Server approval successful');
                   Pi.approvePayment(paymentId, true);
                 } catch (err) {
                   msg.textContent = 'Approval error: ' + err.message;
@@ -343,14 +342,16 @@
               onReadyForServerCompletion: async (paymentId, txid) => {
                 console.log('onReadyForServerCompletion called with paymentId:', paymentId, 'txid:', txid);
                 try {
+                  // Replace with your actual server endpoint
                   const response = await fetch('https://your-server.com/api/complete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ paymentId, txid }),
                   });
                   if (!response.ok) {
-                    throw new Error('Server completion failed');
+                    throw new Error('Server completion failed: ' + response.statusText);
                   }
+                  console.log('Server completion successful');
                   Pi.completePayment(paymentId, true);
                   msg.textContent = 'Payment completed successfully! (TXID: ' + txid + ')';
                   msg.className = 'msg success';
@@ -372,6 +373,7 @@
               },
             }
           );
+          console.log('Pi.createPayment called, expecting Pi Wallet page');
         } catch (err) {
           msg.textContent = 'Authentication or payment error: ' + (err.message || err);
           msg.className = 'msg';
