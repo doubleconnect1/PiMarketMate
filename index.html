@@ -222,13 +222,8 @@
       const sdkLoaded = await initializeSdk();
       if (!sdkLoaded) return;
 
-      // Validate appId
-      const appId = 'YOUR_APP_ID'; // Replace with your Pi Developer Portal appId
-      if (appId === 'YOUR_APP_ID') {
-        msg.textContent = 'Error: Please set a valid appId in the script.';
-        msg.className = 'msg';
-        return;
-      }
+      // Set appId
+      const appId = 'marketmate'; // Your appId from Pi Developer Portal
 
       // Initialize Pi SDK
       try {
