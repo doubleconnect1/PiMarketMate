@@ -41,7 +41,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Pi Market Mate Payment</title>
+  <title>Pi Market Mate Auth Test</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
@@ -69,28 +69,6 @@
       text-align: center;
       color: #1e293b;
     }
-    .input-block {
-      margin-bottom: 1.5rem;
-    }
-    label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-size: 0.95rem;
-      color: #374151;
-    }
-    input {
-      width: 100%;
-      padding: 0.75rem;
-      border-radius: 8px;
-      border: 1px solid #d1d5db;
-      font-size: 1rem;
-      box-sizing: border-box;
-    }
-    input:focus {
-      outline: none;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
     button {
       width: 100%;
       padding: 0.9rem;
@@ -101,6 +79,7 @@
       border-radius: 8px;
       cursor: pointer;
       transition: background 0.2s;
+      margin-bottom: 0.5rem;
     }
     button:hover {
       background: #2563eb;
@@ -142,23 +121,30 @@
       background: #f9fafb;
       padding: 0.5rem;
       border-radius: 8px;
-      max-height: 100px;
+      max-height: 150px;
       overflow-y: auto;
       white-space: pre-wrap;
+    }
+    .download-btn {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: #6b7280;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="title">Pi Market Mate Payment</div>
-    <div class="input-block">
-      <label for="amount">Payment Amount (e.g., 10 Pi)</label>
-      <input id="amount" type="number" min="0.01" step="0.01" placeholder="e.g., 10" />
-    </div>
-    <button id="payBtn" disabled>Pay with Pi Wallet</button>
+    <div class="title">Pi Market Mate Auth Test</div>
+    <button id="authBtn" disabled>Authenticate</button>
     <div id="msg" class="msg"></div>
     <div id="userAgentBlock" class="user-agent"></div>
     <div id="debugLog" class="debug-log"></div>
+    <a id="downloadLog" class="download-btn" style="display: none;">Download Debug Log</a>
   </div>
   <script type="text/javascript">
     var gk_isXlsx = false;
@@ -197,7 +183,6 @@
       return typeof window.Pi !== 'undefined';
     }
 
-    // Debug log function to display in UI
     let debugLogs = [];
     function addDebugLog(message) {
       const timestamp = new Date().toLocaleTimeString();
@@ -205,6 +190,17 @@
       if (debugLogs.length > 10) debugLogs.shift();
       document.getElementById('debugLog').textContent = debugLogs.join('\n');
       console.log(message);
+      updateDownloadLink();
+    }
+
+    function updateDownloadLink() {
+      const logContent = debugLogs.join('\n');
+      const blob = new Blob([logContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const downloadLink = document.getElementById('downloadLog');
+      downloadLink.href = url;
+      downloadLink.download = 'debug_log.txt';
+      downloadLink.style.display = 'inline-block';
     }
 
     let Pi;
@@ -272,7 +268,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
-      const payBtn = document.getElementById('payBtn');
+      const authBtn = document.getElementById('authBtn');
       const msg = document.getElementById('msg');
 
       addDebugLog('Page loaded, initializing SDK');
@@ -294,7 +290,7 @@
         });
         msg.textContent = 'Pi SDK initialized. Test at https://sandbox.minepi.com/app/marketmate';
         msg.className = 'msg success';
-        payBtn.disabled = false;
+        authBtn.disabled = false;
         addDebugLog('Pi SDK initialized successfully');
         addDebugLog('CRITICAL: Authorize sandbox for https://sandbox.minepi.com/app/marketmate in Pi Mining App > Pi Utilities > Authorize Sandbox');
         alert('Pi SDK initialized. Authorize sandbox for https://sandbox.minepi.com/app/marketmate.');
@@ -306,25 +302,15 @@
         return;
       }
 
-      payBtn.onclick = async () => {
-        addDebugLog('Pay button clicked');
-        alert('Pay button clicked');
-        msg.textContent = 'Processing...';
+      authBtn.onclick = async () => {
+        addDebugLog('Authenticate button clicked');
+        alert('Authenticate button clicked');
+        msg.textContent = 'Authenticating...';
         msg.className = 'msg';
-        const amountInput = document.getElementById('amount').value;
-        const amount = parseFloat(amountInput);
-        addDebugLog('Input amount: ' + amountInput + ', Parsed: ' + amount);
 
-        if (!amount || amount <= 0 || isNaN(amount)) {
-          msg.textContent = 'Enter a valid amount (e.g., 10).';
-          addDebugLog('Invalid amount: ' + amountInput);
-          alert('Invalid amount: ' + amountInput);
-          return;
-        }
-
-        if (!Pi || typeof Pi.createPayment !== 'function') {
+        if (!Pi || typeof Pi.authenticate !== 'function') {
           msg.textContent = 'Pi SDK not loaded.';
-          addDebugLog('Pi SDK not loaded or createPayment missing');
+          addDebugLog('Pi SDK not loaded or authenticate missing');
           alert('Pi SDK not loaded.');
           return;
         }
@@ -332,59 +318,36 @@
         try {
           addDebugLog('Starting authentication with scopes: ["payments"]');
           alert('Starting authentication...');
-          const auth = await Pi.authenticate(
+
+          // Add timeout to catch hangs
+          const authPromise = Pi.authenticate(
             ['payments'],
             (payment) => {
               addDebugLog('Incomplete payment found: ' + JSON.stringify(payment));
               alert('Incomplete payment found.');
             }
           );
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
+          });
+
+          const auth = await Promise.race([authPromise, timeoutPromise]);
+
           addDebugLog('Authentication successful: ' + JSON.stringify(auth));
           alert('Authentication successful!');
-
-          addDebugLog('Creating payment with amount: ' + amount);
-          alert('Creating payment...');
-          Pi.createPayment(
-            {
-              amount,
-              memo: 'Test Payment'
-            },
-            {
-              onReadyForServerApproval: (paymentId) => {
-                addDebugLog('onReadyForServerApproval: ' + paymentId);
-                alert('Approving payment...');
-                Pi.approvePayment(paymentId, true);
-              },
-              onReadyForServerCompletion: (paymentId, txid) => {
-                addDebugLog('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
-                alert('Completing payment...');
-                Pi.completePayment(paymentId, true);
-                msg.textContent = 'Payment completed! TXID: ' + txid;
-                msg.className = 'msg success';
-              },
-              onCancel: (paymentId) => {
-                addDebugLog('Payment canceled: ' + paymentId);
-                alert('Payment canceled.');
-                msg.textContent = 'Payment canceled.';
-                msg.className = 'msg';
-              },
-              onError: (error, payment) => {
-                addDebugLog('Payment error: ' + (error.message || error));
-                alert('Payment error: ' + (error.message || error));
-                msg.textContent = 'Payment error: ' + (error.message || error);
-                msg.className = 'msg';
-              }
-            }
-          );
-          addDebugLog('Pi.createPayment called, expecting Pi Wallet');
-          alert('Payment initiated. Check for Pi Wallet.');
+          msg.textContent = 'Authentication successful!';
+          msg.className = 'msg success';
         } catch (err) {
-          addDebugLog('Error: ' + (err.message || err));
-          alert('Error: ' + (err.message || err));
-          msg.textContent = 'Error: ' + (err.message || err);
+          addDebugLog('Authentication error: ' + (err.message || err));
+          alert('Authentication error: ' + (err.message || err));
+          msg.textContent = 'Authentication error: ' + (err.message || err);
           msg.className = 'msg';
         }
       };
+
+      authBtn.addEventListener('click', () => {
+        addDebugLog('Authenticate button clicked (addEventListener)');
+      });
     });
   </script>
 </body>
