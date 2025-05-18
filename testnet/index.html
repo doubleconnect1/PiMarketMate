@@ -1,1 +1,424 @@
-eded
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pi Market Mate Payment</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      max-width: 400px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .title {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      text-align: center;
+      color: #1e293b;
+    }
+    .input-block {
+      margin-bottom: 1.5rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+      color: #374151;
+    }
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    button {
+      width: 100%;
+      padding: 0.9rem;
+      font-size: 1.1rem;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 0.5rem;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    .msg {
+      margin-top: 1rem;
+      font-size: 0.95rem;
+      text-align: center;
+      color: #dc2626;
+    }
+    .success {
+      color: #16a34a;
+    }
+    .user-agent {
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      color: #4b5563;
+      background: #f3f4f6;
+      padding: 0.75rem;
+      border-radius: 8px;
+      word-break: break-all;
+    }
+    .yes {
+      color: #16a34a;
+      font-weight: bold;
+    }
+    .no {
+      color: #dc2626;
+      font-weight: bold;
+    }
+    .debug-log {
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      color: #4b5563;
+      background: #f9fafb;
+      padding: 0.5rem;
+      border-radius: 8px;
+      max-height: 150px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .download-btn {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: #6b7280;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="title">Pi Market Mate Payment</div>
+    <div class="input-block">
+      <label for="amount">Payment Amount (e.g., 10 Pi)</label>
+      <input id="amount" type="number" min="0.01" step="0.01" placeholder="e.g., 10" />
+    </div>
+    <button id="payBtn" disabled>Pay with Pi Wallet</button>
+    <div id="msg" class="msg"></div>
+    <div id="userAgentBlock" class="user-agent"></div>
+    <div id="debugLog" class="debug-log"></div>
+    <a id="downloadLog" class="download-btn" style="display: none;">Download Debug Log</a>
+  </div>
+  <script type="text/javascript">
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+    function filledCell(cell) {
+      return cell !== '' && cell != null;
+    }
+    function loadFileData(filename) {
+      if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+        try {
+          var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+          var firstSheetName = workbook.SheetNames[0];
+          var worksheet = workbook.Sheets[firstSheetName];
+          var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+          var filteredData = jsonData.filter(row => row.some(filledCell));
+          var headerRowIndex = filteredData.findIndex((row, index) =>
+            row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+          );
+          if (headerRowIndex === -1 || headerRowIndex > 25) {
+            headerRowIndex = 0;
+          }
+          var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+          csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+          return csv;
+        } catch (e) {
+          console.error(e);
+          return "";
+        }
+      }
+      return gk_fileData[filename] || "";
+    }
+  </script>
+  <script>
+    function isPiBrowser() {
+      return typeof window.Pi !== 'undefined';
+    }
+
+    let debugLogs = [];
+    function addDebugLog(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      debugLogs.push(`[${timestamp}] ${message}`);
+      if (debugLogs.length > 10) debugLogs.shift();
+      document.getElementById('debugLog').textContent = debugLogs.join('\n');
+      console.log(message);
+      updateDownloadLink();
+    }
+
+    function updateDownloadLink() {
+      const logContent = debugLogs.join('\n');
+      const blob = new Blob([logContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const downloadLink = document.getElementById('downloadLog');
+      downloadLink.href = url;
+      downloadLink.download = 'debug_log.txt';
+      downloadLink.style.display = 'inline-block';
+    }
+
+    let Pi;
+    let sdkLoadAttempts = 0;
+    const maxAttempts = 2;
+    const sdkUrls = [
+      'https://sdk.minepi.com/pi-sdk.js?v=1',
+      'https://sdk.minepi.com/pi-sdk-2.0.0.js?v=1'
+    ];
+
+    function loadSdk(url) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.async = true;
+        script.onload = () => {
+          addDebugLog('SDK loaded from: ' + url);
+          resolve();
+        };
+        script.onerror = () => {
+          addDebugLog('Failed to load SDK from: ' + url);
+          reject(new Error('SDK load failed'));
+        };
+        document.head.appendChild(script);
+      });
+    }
+
+    async function initializeSdk() {
+      const msg = document.getElementById('msg');
+      const uaBlock = document.getElementById('userAgentBlock');
+      const ua = navigator.userAgent;
+
+      while (sdkLoadAttempts < maxAttempts) {
+        try {
+          await loadSdk(sdkUrls[sdkLoadAttempts]);
+          Pi = window.Pi;
+          addDebugLog('Pi SDK assigned');
+          break;
+        } catch (err) {
+          sdkLoadAttempts++;
+          if (sdkLoadAttempts >= maxAttempts) {
+            msg.textContent = 'Failed to load Pi SDK after multiple attempts.';
+            msg.className = 'msg';
+            uaBlock.innerHTML = "<span class='no'>❌ Pi SDK Not Loaded (Please Use Pi Browser or Check Network)</span><br><b>User Agent:</b> " + ua;
+            addDebugLog('All SDK load attempts failed: ' + err);
+            alert('Failed to load Pi SDK.');
+            return false;
+          }
+        }
+      }
+
+      let browserStatus = isPiBrowser()
+        ? "<span class='yes'>✅ Pi SDK Loaded (Pi Browser Ready)</span>"
+        : "<span class='no'>❌ Pi SDK Not Loaded (Please Use Pi Browser)</span>";
+      uaBlock.innerHTML = browserStatus + "<br><b>User Agent:</b> " + ua;
+
+      if (!isPiBrowser()) {
+        msg.textContent = 'Please open this page in Pi Browser.';
+        addDebugLog('Pi Browser not detected');
+        alert('Pi Browser not detected.');
+        return false;
+      }
+
+      return true;
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const payBtn = document.getElementById('payBtn');
+      const msg = document.getElementById('msg');
+
+      addDebugLog('Page loaded, initializing SDK');
+      const sdkLoaded = await initializeSdk();
+      if (!sdkLoaded) {
+        addDebugLog('SDK initialization failed');
+        alert('SDK initialization failed.');
+        return;
+      }
+
+      const appId = 'marketmate';
+
+      try {
+        addDebugLog('Initializing Pi SDK with appId: ' + appId);
+        await Pi.init({
+          version: '2.0',
+          appId: appId,
+          sandbox: true
+        });
+        msg.textContent = 'Pi SDK initialized. Test at https://sandbox.minepi.com/app/marketmate';
+        msg.className = 'msg success';
+        payBtn.disabled = false;
+        addDebugLog('Pi SDK initialized successfully');
+        addDebugLog('CRITICAL: Authorize sandbox for https://sandbox.minepi.com/app/marketmate in Pi Mining App > Pi Utilities > Authorize Sandbox');
+        alert('Pi SDK initialized. Authorize sandbox for https://sandbox.minepi.com/app/marketmate.');
+      } catch (err) {
+        msg.textContent = 'Failed to initialize Pi SDK: ' + (err.message || err);
+        msg.className = 'msg';
+        addDebugLog('Pi SDK initialization error: ' + err);
+        alert('Pi SDK initialization failed: ' + (err.message || err));
+        return;
+      }
+
+      payBtn.onclick = async () => {
+        addDebugLog('Pay button clicked');
+        alert('Pay button clicked');
+        msg.textContent = 'Processing...';
+        msg.className = 'msg';
+        const amountInput = document.getElementById('amount').value;
+        const amount = parseFloat(amountInput);
+        addDebugLog('Input amount: ' + amountInput + ', Parsed: ' + amount);
+
+        if (!amount || amount <= 0 || isNaN(amount)) {
+          msg.textContent = 'Enter a valid amount (e.g., 10).';
+          addDebugLog('Invalid amount: ' + amountInput);
+          alert('Invalid amount: ' + amountInput);
+          return;
+        }
+
+        if (!Pi || typeof Pi.authenticate !== 'function') {
+          msg.textContent = 'Pi SDK not loaded.';
+          addDebugLog('Pi SDK not loaded or authenticate missing');
+          alert('Pi SDK not loaded.');
+          return;
+        }
+
+        try {
+          addDebugLog('Starting authentication with scopes: ["payments"]');
+          alert('Starting authentication...');
+
+          // Timeout for authentication
+          const authPromise = Pi.authenticate(
+            ['payments'],
+            (payment) => {
+              addDebugLog('Incomplete payment found: ' + JSON.stringify(payment));
+              alert('Incomplete payment found.');
+            }
+          );
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
+          });
+
+          const auth = await Promise.race([authPromise, timeoutPromise]);
+          addDebugLog('Authentication successful: ' + JSON.stringify(auth));
+          alert('Authentication successful!');
+
+          addDebugLog('Creating payment with amount: ' + amount);
+          alert('Creating payment...');
+          Pi.createPayment(
+            {
+              amount,
+              memo: 'Test Payment'
+            },
+            {
+              onReadyForServerApproval: (paymentId) => {
+                addDebugLog('onReadyForServerApproval: ' + paymentId);
+                alert('Approving payment...');
+                Pi.approvePayment(paymentId, true);
+              },
+              onReadyForServerCompletion: (paymentId, txid) => {
+                addDebugLog('onReadyForServerCompletion: ' + paymentId + ', txid: ' + txid);
+                alert('Completing payment...');
+                Pi.completePayment(paymentId, true);
+                msg.textContent = 'Payment completed! TXID: ' + txid;
+                msg.className = 'msg success';
+              },
+              onCancel: (paymentId) => {
+                addDebugLog('Payment canceled: ' + paymentId);
+                alert('Payment canceled.');
+                msg.textContent = 'Payment canceled.';
+                msg.className = 'msg';
+              },
+              onError: (error, payment) => {
+                addDebugLog('Payment error: ' + (error.message || error));
+                alert('Payment error: ' + (error.message || error));
+                msg.textContent = 'Payment error: ' + (error.message || error);
+                msg.className = 'msg';
+              }
+            }
+          );
+          addDebugLog('Pi.createPayment called, expecting Pi Wallet');
+          alert('Payment initiated. Check for Pi Wallet.');
+        } catch (err) {
+          addDebugLog('Error: ' + (err.message || err));
+          alert('Error: ' + (err.message || err));
+          msg.textContent = 'Error: ' + (err.message || err);
+          msg.className = 'msg';
+        }
+      };
+
+      payBtn.addEventListener('click', () => {
+        addDebugLog('Pay button clicked (addEventListener)');
+      });
+    });
+  </script>
+</body>
+</html>
