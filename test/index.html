@@ -1,80 +1,12 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><script type="text/javascript">
-var gk_isXlsx = false;
-var gk_xlsxFileLookup = {};
-var gk_fileData = {};
-function filledCell(cell) {
-  return cell !== '' && cell != null;
-}
-function loadFileData(filename) {
-  if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-    try {
-      var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-      var firstSheetName = workbook.SheetNames[0];
-      var worksheet = workbook.Sheets[firstSheetName];
-      var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-      var filteredData = jsonData.filter(row => row.some(filledCell));
-      var headerRowIndex = filteredData.findIndex((row, index) =>
-        row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-      );
-      if (headerRowIndex === -1 || headerRowIndex > 25) {
-        headerRowIndex = 0;
-      }
-      var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
-      csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-      return csv;
-    } catch (e) {
-      console.error(e);
-      return "";
-    }
-  }
-  return gk_fileData[filename] || "";
-}
-</script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pi Market Mate</title>
+  <script src="https://sdk.minepi.com/pi-sdk.js" onload="console.log('Pi SDK script loaded successfully')" onerror="console.error('Failed to load Pi SDK script')"></script>
+  <!-- Include SheetJS if using XLSX functionality -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <style>
     *,::before,::after{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::before,::after{--tw-content:''}html,:host{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit;min-height:100vh;background-color:#f3f4f6;display:flex;justify-content:center;align-items:center}.w-full{width:100%}.max-w-md{max-width:28rem}.border-2{border-width:2px}.border-solid{border-style:solid}.border-dashed{border-style:dashed}.border-gray-300{--tw-border-opacity:1;border-color:rgb(209 213 219 / var(--tw-bg-opacity))}.border-gray-400{--tw-border-opacity:1;border-color:rgb(156 163 175 / var(--tw-border-opacity))}.border-blue-500{--tw-border-opacity:1;border-color:rgb(59 130 246 / var(--tw-border-opacity))}.rounded-md{border-radius:0.375rem}.p-2{padding:0.5rem}.p-4{padding:1rem}.p-6{padding:1.5rem}.px-4{padding-left:1rem;padding-right:1rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.text-center{text-align:center}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-2xl{font-size:1.5rem;line-height:2rem}.font-medium{font-weight:500}.font-semibold{font-weight:600}.font-bold{font-weight:700}.text-blue-700{--tw-text-opacity:1;color:rgb(29 78 216 / var(--tw-text-opacity))}.text-gray-600{--tw-text-opacity:1;color:rgb(75 85 99 / var(--tw-text-opacity))}.text-gray-700{--tw-text-opacity:1;color:rgb(55 65 81 / var(--tw-text-opacity))}.text-gray-800{--tw-text-opacity:1;color:rgb(31 41 55 / var(--tw-text-opacity))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38 / var(--tw-text-opacity))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity))}.text-green-500{--tw-text-opacity:1;color:rgb(34 197 94 / var(--tw-text-opacity))}.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235 / var(--tw-bg-opacity))}.bg-blue-700{--tw-bg-opacity:1;background-color:rgb(29 78 216 / var(--tw-bg-opacity))}.bg-gray-100{--tw-bg-opacity:1;background-color:rgb(243 244 246 / var(--tw-bg-opacity))}.bg-gray-300{--tw-bg-opacity:1;background-color:rgb(209 213 219 / var(--tw-bg-opacity))}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity))}.shadow-lg{--tw-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000),var(--tw-ring-shadow, 0 0 #0000),var(--tw-shadow)}.hover\:bg-blue-700:hover{--tw-bg-opacity:1;background-color:rgb(29 78 216 / var(--tw-bg-opacity))}.hover\:bg-gray-400:hover{--tw-bg-opacity:1;background-color:rgb(156 163 175 / var(--tw-bg-opacity))}.focus\:outline-none:focus{outline:2px solid transparent;outline-offset:2px}.focus\:ring-2:focus{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow, 0 0 #0000)}.focus\:ring-blue-500:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(59 130 246 / var(--tw-ring-opacity))}.focus\:ring-gray-300:focus{--tw-ring-opacity:1;--tw-ring-color:rgb(209 213 219 / var(--tw-ring-opacity))}.transition{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.flex{display:flex}.hidden{display:none}.items-center{align-items:center}.justify-center{justify-content:center}.space-x-4>:not([hidden])~:not([hidden]){--tw-space-x-reverse:0;margin-right:calc(1rem * calc(1 - var(--tw-space-x-reverse)));margin-left:calc(1rem * var(--tw-space-x-reverse))}.mt-1{margin-top:0.25rem}.mt-2{margin-top:0.5rem}.mt-4{margin-top:1rem}.mt-6{margin-top:1.5rem}.mb-2{margin-bottom:0.5rem}.mb-4{margin-bottom:1rem}.block{display:block}.flex-1{flex:1 1 0%}.max-h-40{max-height:10rem}.overflow-y-auto{overflow-y:auto}
     @keyframes fadeIn {
@@ -153,7 +85,6 @@ function loadFileData(filename) {
       display: block;
     }
   </style>
-  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
 </head>
 <body>
   <div class="container">
@@ -432,6 +363,39 @@ function loadFileData(filename) {
     </div>
   </div>
   <script>
+    // XLSX Processing
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+    function filledCell(cell) {
+      return cell !== '' && cell != null;
+    }
+    function loadFileData(filename) {
+      if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+        try {
+          var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+          var firstSheetName = workbook.SheetNames[0];
+          var worksheet = workbook.Sheets[firstSheetName];
+          var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+          var filteredData = jsonData.filter(row => row.some(filledCell));
+          var headerRowIndex = filteredData.findIndex((row, index) =>
+            row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+          );
+          if (headerRowIndex === -1 || headerRowIndex > 25) {
+            headerRowIndex = 0;
+          }
+          var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+          csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+          return csv;
+        } catch (e) {
+          console.error(e);
+          return "";
+        }
+      }
+      return gk_fileData[filename] || "";
+    }
+
+    // App Logic
     let currentMode = 'usd-to-pi';
     let lastPiPrices = {
       AFN: null, ALL: null, DZD: null, EUR: null, AOA: null, XCD: null, ARS: null, AMD: null, AUD: null, AZN: null,
@@ -454,23 +418,9 @@ function loadFileData(filename) {
     let lastCalculatedPiAmount = null;
     let recentCalculations = JSON.parse(localStorage.getItem('piMarketMateCalculations')) || [];
 
-    // Initialize Pi SDK
-    let Pi;
-    try {
-      Pi = window.Pi;
-      if (!Pi) {
-        throw new Error("Pi SDK not found");
-      }
-      Pi.init({ version: "2.0", sandbox: true });
-      console.log("Pi SDK initialized successfully");
-    } catch (error) {
-      console.error("Failed to initialize Pi SDK: " + error.message);
-    }
-
-    // Function to retry SDK initialization
     async function ensurePiSDKReady(maxRetries = 5, delayMs = 3000, timeoutMs = 20000) {
       return new Promise((resolve, reject) => {
-        if (Pi.isReady) {
+        if (window.Pi && window.Pi.isReady) {
           console.log("Pi SDK is ready on initial check");
           resolve(true);
           return;
@@ -479,10 +429,22 @@ function loadFileData(filename) {
         let retries = 0;
         let hasResolved = false;
 
-        // Listen for SDK ready event
-        if (typeof Pi.onReady === 'function') {
+        if (!window.Pi) {
+          console.error("Pi SDK not found. Ensure the script is loaded and you're in Pi Browser.");
+          reject(new Error("Pi SDK not found"));
+          return;
+        }
+
+        try {
+          window.Pi.init({ version: "2.0", sandbox: false });
+          console.log("Pi SDK initialized with Mainnet");
+        } catch (error) {
+          console.error("Initial Pi SDK init failed: " + error.message);
+        }
+
+        if (typeof window.Pi.onReady === 'function') {
           console.log("Listening for Pi SDK ready event");
-          Pi.onReady(() => {
+          window.Pi.onReady(() => {
             if (!hasResolved) {
               hasResolved = true;
               console.log("Pi SDK ready event triggered");
@@ -490,12 +452,11 @@ function loadFileData(filename) {
             }
           });
         } else {
-          console.log("Pi SDK ready event listener not available");
+          console.warn("Pi SDK onReady not available");
         }
 
-        // Retry loop
         const retryInterval = setInterval(async () => {
-          if (Pi.isReady) {
+          if (window.Pi.isReady) {
             if (!hasResolved) {
               hasResolved = true;
               clearInterval(retryInterval);
@@ -511,37 +472,33 @@ function loadFileData(filename) {
             clearTimeout(timeoutTimer);
             if (!hasResolved) {
               hasResolved = true;
-              console.log("Failed to initialize Pi SDK after " + maxRetries + " retries");
-              reject(new Error("Pi SDK not ready after maximum retries"));
+              console.error("Pi SDK failed to become ready after " + maxRetries + " retries");
+              reject(new Error("Pi SDK failed to initialize after retries"));
             }
             return;
           }
 
           console.log("Pi SDK not ready, retrying (" + (retries + 1) + "/" + maxRetries + ")...");
           try {
-            // Alternate between sandbox true/false to try different configurations
-            const sandboxMode = retries % 2 === 0;
-            Pi.init({ version: "2.0", sandbox: sandboxMode });
-            console.log("Retried with sandbox: " + sandboxMode);
+            window.Pi.init({ version: "2.0", sandbox: false });
+            console.log("Retried Pi SDK initialization");
           } catch (error) {
             console.log("Retry " + (retries + 1) + " failed: " + error.message);
           }
           retries++;
         }, delayMs);
 
-        // Timeout for the entire process
         const timeoutTimer = setTimeout(() => {
           if (!hasResolved) {
             hasResolved = true;
             clearInterval(retryInterval);
-            console.log("Pi SDK initialization timed out after " + timeoutMs + "ms");
+            console.error("Pi SDK initialization timed out after " + timeoutMs + "ms");
             reject(new Error("Pi SDK initialization timed out"));
           }
         }, timeoutMs);
       });
     }
 
-    // Check Pi Network server availability
     async function checkPiServer() {
       try {
         const response = await fetch('https://api.minepi.com/v1/health', { method: 'HEAD', timeout: 5000 });
@@ -572,6 +529,7 @@ function loadFileData(filename) {
         throw error;
       }
     }
+
     async function updatePiPrice() {
       const manualPriceInput = document.getElementById('manual-price');
       try {
@@ -586,6 +544,7 @@ function loadFileData(filename) {
         showError('Pi price unavailable. Enter a manual price below.');
       }
     }
+
     function getEffectivePiPrice() {
       const manualPrice = parseFloat(document.getElementById('manual-price').value);
       if (!isNaN(manualPrice) && manualPrice > 0) {
@@ -593,6 +552,7 @@ function loadFileData(filename) {
       }
       return lastPiPrices[currentCurrency];
     }
+
     function calculateAmount(amount, piPrice) {
       if (isNaN(amount) || amount <= 0) {
         showError(`Please enter a valid ${currentMode === 'usd-to-pi' ? currentCurrency : 'Pi'} amount.`);
@@ -608,6 +568,7 @@ function loadFileData(filename) {
         return (amount * piPrice).toFixed(2);
       }
     }
+
     function saveCalculation(input, result, paid = false) {
       const calculation = {
         mode: currentMode,
@@ -622,6 +583,7 @@ function loadFileData(filename) {
       localStorage.setItem('piMarketMateCalculations', JSON.stringify(recentCalculations));
       updateRecentCalculations();
     }
+
     function updateRecentCalculations() {
       const list = document.getElementById('recent-calculations');
       list.innerHTML = '';
@@ -636,6 +598,7 @@ function loadFileData(filename) {
         list.appendChild(li);
       });
     }
+
     function showError(message) {
       const errorDiv = document.getElementById('error');
       const errorMessage = document.getElementById('error-message');
@@ -646,12 +609,14 @@ function loadFileData(filename) {
       }
       console.error("Error: " + message);
     }
+
     function clearError() {
       const errorDiv = document.getElementById('error');
       if (errorDiv) {
         errorDiv.classList.add('hidden');
       }
     }
+
     function setMode(mode) {
       currentMode = mode;
       const usdToPiBtn = document.getElementById('usd-to-pi-btn');
@@ -677,22 +642,114 @@ function loadFileData(filename) {
         document.getElementById('result').classList.add('hidden');
       }
     }
+
     function isPiBrowser() {
       const hostname = window.location.hostname.toLowerCase();
-      const isPi = hostname.includes('pimarketmate.com') || hostname.includes('marketmate') || hostname.includes('pinet.com');
+      const isPi = hostname.includes('pinet.com') || hostname.includes('marketmate5838.pinet.com') || hostname.includes('pimarketmate.com');
       console.log("Pi Browser check: " + (isPi ? "Yes" : "No"));
       return isPi;
     }
+
+    async function initiatePayment(amount, memo, metadata) {
+      try {
+        if (!isPiBrowser()) {
+          showError('Please open this app in Pi Browser to make a payment.');
+          return;
+        }
+        if (!window.Pi) {
+          showError("Pi SDK is not available. Please ensure you're in the Pi Browser.");
+          return;
+        }
+        const isReady = await ensurePiSDKReady();
+        if (!isReady) {
+          throw new Error("Pi SDK failed to become ready");
+        }
+        console.log("Authenticating user...");
+        const authResult = await window.Pi.authenticate(['payments', 'username'], (payment) => {
+          console.log("Incomplete payment found:", payment);
+          // Handle incomplete payments if needed
+        });
+        console.log("User authenticated:", authResult);
+        console.log("Checking Pi Network server availability...");
+        const serverAvailable = await checkPiServer();
+        if (!serverAvailable) {
+          showError('Pi Network servers are unavailable. Please try again later.');
+          return;
+        }
+        console.log("Initiating payment for " + amount + " Pi...");
+
+        const paymentData = {
+          amount: amount,
+          memo: memo,
+          metadata: metadata
+        };
+        const paymentCallbacks = {
+          onReadyForServerApproval: async (paymentId) => {
+            console.log("Payment ID ready for approval: " + paymentId);
+            try {
+              const response = await fetch('https://your-server.com/api/payments/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId })
+              });
+              if (!response.ok) {
+                throw new Error('Server approval failed');
+              }
+              console.log("Payment approved by server");
+            } catch (error) {
+              console.error("Server approval error: " + error.message);
+              showError('Payment approval failed: ' + error.message);
+            }
+          },
+          onReadyForServerCompletion: async (paymentId, txid) => {
+            console.log("Payment ready for completion: " + paymentId + ", txid: " + txid);
+            try {
+              const response = await fetch('https://your-server.com/api/payments/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId, txid })
+              });
+              if (!response.ok) {
+                throw new Error('Server completion failed');
+              }
+              console.log("Payment completed successfully");
+              saveCalculation(amount, amount, true);
+              showError('Payment successful! Transaction ID: ' + txid);
+            } catch (error) {
+              console.error("Server completion error: " + error.message);
+              showError('Payment completion failed: ' + error.message);
+            }
+          },
+          onCancel: () => {
+            console.log("Payment cancelled by user");
+            showError('Payment cancelled by user.');
+          },
+          onError: (error) => {
+            console.error("Payment error: " + error.message);
+            showError('Payment failed: ' + error.message);
+          }
+        };
+
+        const payment = await window.Pi.createPayment(paymentData, paymentCallbacks);
+        console.log("Payment created: ", payment);
+      } catch (error) {
+        console.error("Error in initiatePayment: " + error.message);
+        showError('An error occurred during payment: ' + error.message);
+      }
+    }
+
     const usdToPiBtn = document.getElementById('usd-to-pi-btn');
     if (usdToPiBtn) {
       usdToPiBtn.addEventListener('click', () => setMode('usd-to-pi'));
       usdToPiBtn.addEventListener('touchstart', () => setMode('usd-to-pi'));
     }
+
     const piToUsdBtn = document.getElementById('pi-to-usd-btn');
     if (piToUsdBtn) {
       piToUsdBtn.addEventListener('click', () => setMode('pi-to-usd'));
       piToUsdBtn.addEventListener('touchstart', () => setMode('pi-to-usd'));
     }
+
     const currencySelect = document.getElementById('currency');
     const currencyCheck = document.getElementById('currency-check');
     if (currencySelect && currencyCheck) {
@@ -714,6 +771,7 @@ function loadFileData(filename) {
         }
       });
     }
+
     const amountInput = document.getElementById('amount');
     const amountCheck = document.getElementById('amount-check');
     if (amountInput && amountCheck) {
@@ -726,6 +784,7 @@ function loadFileData(filename) {
         }
       });
     }
+
     const calculateBtn = document.getElementById('calculate-btn');
     if (calculateBtn) {
       calculateBtn.addEventListener('click', async () => {
@@ -816,96 +875,6 @@ function loadFileData(filename) {
       });
     }
 
-    async function initiatePayment(amount, memo, metadata) {
-      try {
-        if (!isPiBrowser()) {
-          showError('Please open this app in Pi Browser to make a payment.');
-          return;
-        }
-        if (!Pi) {
-          showError("Pi SDK is not available. Please ensure you're in the Pi Browser.");
-          return;
-        }
-        try {
-          const isReady = await ensurePiSDKReady();
-          if (!isReady) {
-            throw new Error("Pi SDK failed to become ready");
-          }
-        } catch (error) {
-          showError("Pi SDK failed to become ready after retries. Please restart Pi Browser.");
-          return;
-        }
-        console.log("Checking Pi Network server availability...");
-        const serverAvailable = await checkPiServer();
-        if (!serverAvailable) {
-          showError('Pi Network servers appear unavailable. Please try again later.');
-          return;
-        }
-        console.log("Initiating payment for " + amount + " Pi...");
-        const payment = await Pi.createPayment({
-          amount: amount,
-          memo: memo,
-          metadata: metadata
-        });
-        payment.then(async (paymentResult) => {
-          console.log("Payment approved by user, paymentId: " + paymentResult.identifier);
-          await simulateSendToBackend(paymentResult.identifier);
-        }).catch((error) => {
-          console.log("Payment failed: " + (error.message || 'Unknown error'));
-          if (error.message.includes("User cancelled")) {
-            showError('Payment cancelled by user.');
-          } else if (error.message.includes("Insufficient balance")) {
-            showError('Insufficient Pi balance to complete the payment.');
-          } else {
-            showError('Payment failed: ' + (error.message || 'Unknown error'));
-          }
-        });
-      } catch (error) {
-        console.log("Error in initiatePayment: " + error.message);
-        showError('An error occurred during payment: ' + error.message);
-      }
-    }
-
-    async function simulateSendToBackend(paymentId) {
-      try {
-        console.log("Simulating backend verification for paymentId: " + paymentId);
-        const status = await simulateVerifyPayment(paymentId);
-        if (status === 'pending') {
-          console.log("Payment is pending, simulating completion...");
-          await simulateCompletePayment(paymentId);
-        } else if (status === 'completed') {
-          console.log("Payment already completed");
-          showError('Payment successful! Transaction completed.');
-        } else {
-          console.log("Payment status: " + status);
-          showError('Payment ' + status + '.');
-        }
-      } catch (error) {
-        console.log("Backend simulation failed: " + error.message);
-        showError('Failed to verify/complete payment: ' + error.message);
-      }
-    }
-
-    async function simulateVerifyPayment(paymentId) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve('pending');
-        }, 1000);
-      });
-    }
-
-    async function simulateCompletePayment(paymentId) {
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const txid = 'TX' + Math.random().toString(36).substr(2, 9);
-          console.log("Payment completed with txid: " + txid);
-          saveCalculation(paymentId, paymentId, true);
-          showError('Payment successful! Transaction ID: ' + txid);
-          resolve(txid);
-        }, 1000);
-      });
-    }
-
     const donationLink = document.getElementById('donation-link');
     const donationPopup = document.getElementById('donation-popup');
     const overlay = document.getElementById('overlay');
@@ -968,10 +937,6 @@ function loadFileData(filename) {
       });
     }
 
-    setMode('usd-to-pi');
-    updatePiPrice();
-    updateRecentCalculations();
-
     // Text Viewer Functionality
     const privacyPolicyLink = document.getElementById('privacy-policy-link');
     const termsOfServiceLink = document.getElementById('terms-of-service-link');
@@ -1028,6 +993,7 @@ function loadFileData(filename) {
         displayText(privacyPolicyUrl, 'Privacy Policy');
       });
     }
+
     if (termsOfServiceLink) {
       termsOfServiceLink.addEventListener('click', (e) => {
         e.preventDefault();
@@ -1040,6 +1006,7 @@ function loadFileData(filename) {
         displayText(termsOfServiceUrl, 'Terms of Service');
       });
     }
+
     if (closeTextBtn) {
       closeTextBtn.addEventListener('click', () => {
         textViewer.style.display = 'none';
@@ -1052,6 +1019,10 @@ function loadFileData(filename) {
         textFallback.classList.add('hidden');
       });
     }
+
+    setMode('usd-to-pi');
+    updatePiPrice();
+    updateRecentCalculations();
   </script>
 </body>
 </html>
