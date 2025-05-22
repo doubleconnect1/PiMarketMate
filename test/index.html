@@ -339,65 +339,6 @@
       });
     }
 
-    async function checkPiServer() {
-      console.log('Checking Pi Network Testnet server availability...');
-      const endpoints = [
-        { url: 'https://api.testnet.minepi.com/v2/payments', critical: true },
-        { url: 'https://api.testnet.minepi.com/v2/me', critical: false },
-        { url: 'https://api.testnet.minepi.com/v2/health', critical: false }
-      ];
-
-      for (const endpoint of endpoints) {
-        console.log(`Pinging endpoint: ${endpoint.url}`);
-        try {
-          const response = await fetch(endpoint.url, {
-            method: 'GET',
-            headers: {
-              'Authorization': 'Key xxphzwyfmzalumwmiewge3hshjos3dsqwemu1hyuerpiomyff97grrsgxfvhpzdq'
-            },
-            signal: AbortSignal.timeout(8000)
-          });
-          const responseDetails = {
-            url: endpoint.url,
-            status: response.status,
-            ok: response.ok,
-            statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries())
-          };
-          let responseBody = 'No body';
-          try {
-            responseBody = await response.text();
-          } catch (e) {
-            console.warn(`Failed to read response body for ${endpoint.url}:`, e);
-          }
-          console.log('Pi Network Testnet server ping:', {
-            ...responseDetails,
-            body: responseBody,
-            isAvailable: response.ok || [401, 403, 429, 503, 500].includes(response.status)
-          });
-          if (response.ok || [401, 403, 429, 503, 500].includes(response.status)) {
-            return true;
-          }
-          if (endpoint.critical) {
-            console.warn(`Critical endpoint ${endpoint.url} failed with status ${response.status}`);
-            return false;
-          }
-        } catch (error) {
-          console.error(`Pi Network Testnet server ping failed for ${endpoint.url}:`, {
-            message: error.message || 'Unknown error',
-            code: error.code,
-            cause: error.cause,
-            stack: error.stack
-          });
-          if (endpoint.critical) {
-            return false;
-          }
-        }
-      }
-      console.warn('All endpoints failed, but allowing payment to proceed as non-critical.');
-      return true;
-    }
-
     async function fetchPiPrice(currency) {
       console.log(`Fetching Pi price for currency: ${currency}`);
       try {
@@ -560,7 +501,7 @@
     }
 
     async function initiatePayment(amount, memo, metadata) {
-      console.log('Initiating payment:', { amount, memo, metadata });
+      console.log('Initiating payment:', { amount, memo, metadata, timestamp: new Date().toISOString() });
       try {
         if (!isPiBrowser()) {
           showError('Please open this app in Pi Browser to make a payment.');
@@ -587,17 +528,10 @@
         if (!isReady) {
           throw new Error('Pi SDK failed to become ready');
         }
-        console.log('Checking Pi Network Testnet server availability...');
-        const serverAvailable = await checkPiServer();
-        if (!serverAvailable) {
-          console.warn('Pi Network Testnet servers may be unavailable, proceeding with payment attempt.');
-          showError('Warning: Pi Network Testnet servers may be unavailable, but attempting payment.');
-        } else {
-          console.log('Pi Network Testnet servers are available.');
-        }
+        console.log('Pi SDK ready, proceeding with authentication...');
         console.log('Authenticating user...');
         let authResult;
-        const authAttempts = serverAvailable ? 1 : 2; // Retry if server is unavailable
+        const authAttempts = 2; // Always try twice for robustness
         for (let attempt = 1; attempt <= authAttempts; attempt++) {
           try {
             console.log(`Authentication attempt ${attempt}/${authAttempts}`);
@@ -645,8 +579,21 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paymentId })
               });
+              const responseDetails = {
+                status: response.status,
+                ok: response.ok,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries())
+              };
+              let responseBody = 'No body';
+              try {
+                responseBody = await response.text();
+              } catch (e) {
+                console.warn('Failed to read approval response body:', e);
+              }
+              console.log('Approval response:', { ...responseDetails, body: responseBody });
               if (!response.ok) {
-                throw new Error(`Server approval failed: ${response.status}`);
+                throw new Error(`Server approval failed: ${response.status} ${response.statusText}`);
               }
               console.log('Payment approved by server');
             } catch (error) {
@@ -662,8 +609,21 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paymentId, txid })
               });
+              const responseDetails = {
+                status: response.status,
+                ok: response.ok,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries())
+              };
+              let responseBody = 'No body';
+              try {
+                responseBody = await response.text();
+              } catch (e) {
+                console.warn('Failed to read completion response body:', e);
+              }
+              console.log('Completion response:', { ...responseDetails, body: responseBody });
               if (!response.ok) {
-                throw new Error(`Server completion failed: ${response.status}`);
+                throw new Error(`Server completion failed: ${response.status} ${response.statusText}`);
               }
               console.log('Payment completed successfully');
               saveCalculation(amount, amount, true);
