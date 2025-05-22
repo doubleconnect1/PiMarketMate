@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -269,6 +230,7 @@
         }
 
         console.log('Checkpoint: Pi SDK object properties:', Object.keys(window.Pi));
+        // Accept either isReady or initialized as true
         const isReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
                         (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
         if (isReady) {
@@ -545,7 +507,7 @@
         console.log('Checkpoint: Pi SDK details:', debugInfo.piSdkDetails);
       }
 
-      if (debugInfo.windowPiExists && (debugInfo.piIsReady !== true && debugInfo.piInitialized !== true)) {
+      if (debugInfo.windowPiExists && (!debugInfo.piIsReady && !debugInfo.piInitialized)) {
         console.log('Checkpoint: Attempting to initialize Pi SDK...');
         try {
           const isReady = await ensurePiSDKReady();
@@ -1068,55 +1030,17 @@ SDK Init Error: ${debugInfo.sdkInitError}
                   lastCalculatedPiAmount = parseFloat(result);
                 }
                 console.log('Checkpoint: Calculation result:', { prefix, value, lastCalculatedPiAmount });
+                saveCalculation(amount, result);
               } else {
                 console.warn('Checkpoint: Result elements not found:', { resultTextPrefix, resultValue, resultDiv });
               }
-              saveCalculation(amount, result);
             }
           } catch (error) {
-            console.error('Checkpoint: Calculate error:', {
+            console.error('Checkpoint: Calculation error:', {
               message: error.message || 'Unknown error',
               stack: error.stack
             });
-            showError('Pi price unavailable. Enter a manual price below.');
-          }
-        });
-        calculateBtn.addEventListener('touchstart', async () => {
-          console.log('Checkpoint: Calculate button touched');
-          clearError();
-          const amount = parseFloat(document.getElementById('amount').value);
-          try {
-            let piPrice = getEffectivePiPrice();
-            if (!piPrice) {
-              await fetchPiPrice(currentCurrency);
-              piPrice = getEffectivePiPrice();
-            }
-            const result = calculateAmount(amount, piPrice);
-            if (result) {
-              const prefix = currentMode === 'usd-to-pi' ? 'You need: ' : 'You get: ';
-              const value = currentMode === 'usd-to-pi' ? `${result} Pi` : `${result} ${currentCurrency}`;
-              const resultTextPrefix = document.getElementById('result-text-prefix');
-              const resultValue = document.getElementById('result-value');
-              const resultDiv = document.getElementById('result');
-              if (resultTextPrefix && resultValue && resultDiv) {
-                resultTextPrefix.textContent = prefix;
-                resultValue.textContent = value;
-                resultDiv.classList.remove('hidden');
-                if (currentMode === 'usd-to-pi') {
-                  lastCalculatedPiAmount = parseFloat(result);
-                }
-                console.log('Checkpoint: Calculation result:', { prefix, value, lastCalculatedPiAmount });
-              } else {
-                console.warn('Checkpoint: Result elements not found:', { resultTextPrefix, resultValue, resultDiv });
-              }
-              saveCalculation(amount, result);
-            }
-          } catch (error) {
-            console.error('Checkpoint: Calculate error:', {
-              message: error.message || 'Unknown error',
-              stack: error.stack
-            });
-            showError('Pi price unavailable. Enter a manual price below.');
+            showError('Failed to calculate amount: ' + (error.message || 'Unknown error'));
           }
         });
       } else {
@@ -1125,29 +1049,26 @@ SDK Init Error: ${debugInfo.sdkInitError}
 
       const payWithPiBtn = document.getElementById('pay-with-pi-btn');
       if (payWithPiBtn) {
-        payWithPiBtn.addEventListener('click', () => {
+        payWithPiBtn.addEventListener('click', async () => {
           console.log('Checkpoint: Pay with Pi button clicked');
-          if (!isPiBrowser()) {
-            showError('Please open this app in Pi Browser to make a payment.');
+          clearError();
+          if (!lastCalculatedPiAmount || isNaN(lastCalculatedPiAmount) || lastCalculatedPiAmount <= 0) {
+            showError('Please calculate a valid Pi amount first.');
             return;
           }
-          if (currentMode !== 'usd-to-pi' || !lastCalculatedPiAmount) {
-            showError('Please calculate a Pi amount first using "Currency to Pi" mode.');
-            return;
+          try {
+            await initiatePayment(
+              lastCalculatedPiAmount,
+              `Payment for ${lastCalculatedPiAmount} Pi`,
+              { type: 'purchase', currency: currentCurrency }
+            );
+          } catch (error) {
+            console.error('Checkpoint: Payment initiation error:', {
+              message: error.message || 'Unknown error',
+              stack: error.stack
+            });
+            showError('Payment initiation failed: ' + (error.message || 'Unknown error'));
           }
-          initiatePayment(lastCalculatedPiAmount, 'Payment for calculated amount via Pi Market Mate', { app: 'Pi Market Mate', type: 'calculated_payment' });
-        });
-        payWithPiBtn.addEventListener('touchstart', () => {
-          console.log('Checkpoint: Pay with Pi button touched');
-          if (!isPiBrowser()) {
-            showError('Please open this app in Pi Browser to make a payment.');
-            return;
-          }
-          if (currentMode !== 'usd-to-pi' || !lastCalculatedPiAmount) {
-            showError('Please calculate a Pi amount first using "Currency to Pi" mode.');
-            return;
-          }
-          initiatePayment(lastCalculatedPiAmount, 'Payment for calculated amount via Pi Market Mate', { app: 'Pi Market Mate', type: 'calculated_payment' });
         });
       } else {
         console.warn('Checkpoint: Element "pay-with-pi-btn" not found');
@@ -1156,7 +1077,6 @@ SDK Init Error: ${debugInfo.sdkInitError}
       const debugBtn = document.getElementById('debug-btn');
       if (debugBtn) {
         debugBtn.addEventListener('click', debugPiSDK);
-        debugBtn.addEventListener('touchstart', debugPiSDK);
       } else {
         console.warn('Checkpoint: Element "debug-btn" not found');
       }
@@ -1164,17 +1084,11 @@ SDK Init Error: ${debugInfo.sdkInitError}
       const closeDebugBtn = document.getElementById('close-debug');
       if (closeDebugBtn) {
         closeDebugBtn.addEventListener('click', () => {
-          console.log('Checkpoint: Close debug panel clicked');
           const debugPanel = document.getElementById('debug-panel');
           if (debugPanel) {
             debugPanel.classList.add('hidden');
-          }
-        });
-        closeDebugBtn.addEventListener('touchstart', () => {
-          console.log('Checkpoint: Close debug panel touched');
-          const debugPanel = document.getElementById('debug-panel');
-          if (debugPanel) {
-            debugPanel.classList.add('hidden');
+          } else {
+            console.warn('Checkpoint: Debug panel not found for close');
           }
         });
       } else {
@@ -1182,74 +1096,50 @@ SDK Init Error: ${debugInfo.sdkInitError}
       }
 
       const donationLink = document.getElementById('donation-link');
-      const donationPopup = document.getElementById('donation-popup');
       const overlay = document.getElementById('overlay');
-      const confirmDonationBtn = document.getElementById('confirm-donation');
-      const cancelDonationBtn = document.getElementById('cancel-donation');
-      const donationAmountSelect = document.getElementById('donation-amount-select');
-
-      if (donationLink) {
+      const donationPopup = document.getElementById('donation-popup');
+      if (donationLink && overlay && donationPopup) {
         donationLink.addEventListener('click', (e) => {
           e.preventDefault();
           console.log('Checkpoint: Donation link clicked');
-          if (!isPiBrowser()) {
-            showError('Please open this app in Pi Browser to make a donation.');
-            return;
-          }
-          donationPopup.classList.add('active');
-          overlay.classList.add('active');
-        });
-        donationLink.addEventListener('touchstart', (e) => {
-          e.preventDefault();
-          console.log('Checkpoint: Donation link touched');
-          if (!isPiBrowser()) {
-            showError('Please open this app in Pi Browser to make a donation.');
-            return;
-          }
-          donationPopup.classList.add('active');
-          overlay.classList.add('active');
+          overlay.classList.remove('hidden');
+          donationPopup.classList.remove('hidden');
         });
       } else {
-        console.warn('Checkpoint: Element "donation-link" not found');
+        console.warn('Checkpoint: Donation elements not found:', { donationLink, overlay, donationPopup });
       }
 
+      const confirmDonationBtn = document.getElementById('confirm-donation');
       if (confirmDonationBtn) {
         confirmDonationBtn.addEventListener('click', async () => {
           console.log('Checkpoint: Confirm donation clicked');
-          const selectedAmount = parseFloat(donationAmountSelect.value);
-          if (isNaN(selectedAmount) || selectedAmount <= 0) {
-            showError('Please select a valid donation amount.');
-            return;
+          const donationAmount = parseFloat(document.getElementById('donation-amount-select').value);
+          try {
+            await initiatePayment(
+              donationAmount,
+              `Donation of ${donationAmount} Pi`,
+              { type: 'donation' }
+            );
+            overlay.classList.add('hidden');
+            donationPopup.classList.add('hidden');
+          } catch (error) {
+            console.error('Checkpoint: Donation payment error:', {
+              message: error.message || 'Unknown error',
+              stack: error.stack
+            });
+            showError('Donation failed: ' + (error.message || 'Unknown error'));
           }
-          donationPopup.classList.remove('active');
-          overlay.classList.remove('active');
-          initiatePayment(selectedAmount, 'Donation to Pi Market Mate', { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' });
-        });
-        confirmDonationBtn.addEventListener('touchstart', async () => {
-          console.log('Checkpoint: Confirm donation touched');
-          const selectedAmount = parseFloat(donationAmountSelect.value);
-          if (isNaN(selectedAmount) || selectedAmount <= 0) {
-            showError('Please select a valid donation amount.');
-            return;
-          }
-          donationPopup.classList.remove('active');
-          overlay.classList.remove('active');
-          initiatePayment(selectedAmount, 'Donation to Pi Market Mate', { app: 'Pi Market Mate', subdomain: 'marketmate5838', walletAddress: 'GA4QWW7FATZUF4QYGMKK3NXMTDVDXWVD6U36UZJJWUHKO7GQ6AU5MMGP' });
         });
       } else {
         console.warn('Checkpoint: Element "confirm-donation" not found');
       }
 
+      const cancelDonationBtn = document.getElementById('cancel-donation');
       if (cancelDonationBtn) {
         cancelDonationBtn.addEventListener('click', () => {
           console.log('Checkpoint: Cancel donation clicked');
-          donationPopup.classList.remove('active');
-          overlay.classList.remove('active');
-        });
-        cancelDonationBtn.addEventListener('touchstart', () => {
-          console.log('Checkpoint: Cancel donation touched');
-          donationPopup.classList.remove('active');
-          overlay.classList.remove('active');
+          overlay.classList.add('hidden');
+          donationPopup.classList.add('hidden');
         });
       } else {
         console.warn('Checkpoint: Element "cancel-donation" not found');
@@ -1263,58 +1153,50 @@ SDK Init Error: ${debugInfo.sdkInitError}
       const textDownloadLink = document.getElementById('text-download-link');
       const closeTextBtn = document.getElementById('close-text');
 
-      async function displayText(url, title) {
-        console.log(`Checkpoint: Displaying text: ${title} from ${url}`);
+      async function showTextFile(url, filename) {
+        console.log('Checkpoint: Fetching text file:', url);
         try {
           const response = await fetch(url);
           if (!response.ok) {
-            throw new Error(`Failed to fetch ${title} (${response.status} ${response.statusText})`);
-          }
-          const contentType = response.headers.get('content-type');
-          if (!contentType || !contentType.includes('text/plain')) {
-            throw new Error(`Unexpected content type for ${title}: ${contentType || 'none'}`);
+            throw new Error(`Failed to fetch ${filename}: ${response.status}`);
           }
           const text = await response.text();
-          if (!text || text.trim() === '') {
-            throw new Error(`${title} file is empty`);
+          if (textViewer && textContent && textFallback && textDownloadLink) {
+            textContent.textContent = text;
+            textFallback.classList.add('hidden');
+            textDownloadLink.href = url;
+            textDownloadLink.download = filename;
+            textViewer.classList.remove('hidden');
+            textViewer.scrollIntoView({ behavior: 'smooth' });
+          } else {
+            console.warn('Checkpoint: Text viewer elements not found:', { textViewer, textContent, textFallback, textDownloadLink });
+            alert(`Content of ${filename}:\n${text}`);
           }
-          textContent.textContent = text;
-          textViewer.style.display = 'block';
-          textFallback.classList.add('hidden');
-          textDownloadLink.href = url;
         } catch (error) {
-          console.error('Checkpoint: Display text error:', {
+          console.error('Checkpoint: Text file fetch error:', {
             message: error.message || 'Unknown error',
             stack: error.stack
           });
-          let fallbackMessage = 'Failed to load the content. ';
-          if (error.message.includes('Failed to fetch')) {
-            fallbackMessage += `${title} may be missing or inaccessible. `;
-          } else if (error.message.includes('Unexpected content type')) {
-            fallbackMessage += `The server returned an invalid content type. `;
-          } else if (error.message.includes('file is empty')) {
-            fallbackMessage += `The ${title} file is empty. `;
+          if (textViewer && textFallback) {
+            textFallback.textContent = `Failed to load ${filename}.`;
+            textFallback.classList.remove('hidden');
+            textViewer.classList.remove('hidden');
+            textViewer.scrollIntoView({ behavior: 'smooth' });
+          } else {
+            console.warn('Checkpoint: Text viewer elements not found for error:', { textViewer, textFallback });
+            alert(`Error: Failed to load ${filename}.`);
           }
-          fallbackMessage += `Please try again later or <a id="text-download-link" href="${url}" class="text-blue-600 hover:underline">download the file</a>.`;
-          textContent.textContent = '';
-          textFallback.innerHTML = fallbackMessage;
-          textFallback.classList.remove('hidden');
         }
-        textViewer.scrollIntoView({ behavior: 'smooth' });
       }
 
       if (privacyPolicyLink) {
         privacyPolicyLink.addEventListener('click', (e) => {
           e.preventDefault();
           console.log('Checkpoint: Privacy policy link clicked');
-          const privacyPolicyUrl = 'https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/docs/PrivacyPolicy.txt';
-          displayText(privacyPolicyUrl, 'Privacy Policy');
-        });
-        privacyPolicyLink.addEventListener('touchstart', (e) => {
-          e.preventDefault();
-          console.log('Checkpoint: Privacy policy link touched');
-          const privacyPolicyUrl = 'https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/docs/PrivacyPolicy.txt';
-          displayText(privacyPolicyUrl, 'Privacy Policy');
+          showTextFile(
+            'https://raw.githubusercontent.com/doubleconnect/pi-market-mate/main/privacy-policy.txt',
+            'privacy-policy.txt'
+          );
         });
       } else {
         console.warn('Checkpoint: Element "privacy-policy-link" not found');
@@ -1324,14 +1206,10 @@ SDK Init Error: ${debugInfo.sdkInitError}
         termsOfServiceLink.addEventListener('click', (e) => {
           e.preventDefault();
           console.log('Checkpoint: Terms of service link clicked');
-          const termsOfServiceUrl = 'https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/docs/TermsOfService.txt';
-          displayText(termsOfServiceUrl, 'Terms of Service');
-        });
-        termsOfServiceLink.addEventListener('touchstart', (e) => {
-          e.preventDefault();
-          console.log('Checkpoint: Terms of service link touched');
-          const termsOfServiceUrl = 'https://raw.githubusercontent.com/doubleconnect1/PiMarketMate/main/docs/TermsOfService.txt';
-          displayText(termsOfServiceUrl, 'Terms of Service');
+          showTextFile(
+            'https://raw.githubusercontent.com/doubleconnect/pi-market-mate/main/terms-of-service.txt',
+            'terms-of-service.txt'
+          );
         });
       } else {
         console.warn('Checkpoint: Element "terms-of-service-link" not found');
@@ -1340,28 +1218,34 @@ SDK Init Error: ${debugInfo.sdkInitError}
       if (closeTextBtn) {
         closeTextBtn.addEventListener('click', () => {
           console.log('Checkpoint: Close text viewer clicked');
-          textViewer.style.display = 'none';
-          textContent.textContent = '';
-          textFallback.classList.add('hidden');
-        });
-        closeTextBtn.addEventListener('touchstart', () => {
-          console.log('Checkpoint: Close text viewer touched');
-          textViewer.style.display = 'none';
-          textContent.textContent = '';
-          textFallback.classList.add('hidden');
+          if (textViewer) {
+            textViewer.classList.add('hidden');
+            textContent.textContent = '';
+            textFallback.classList.add('hidden');
+          } else {
+            console.warn('Checkpoint: Text viewer not found for close');
+          }
         });
       } else {
         console.warn('Checkpoint: Element "close-text" not found');
       }
     }
 
-    // Initialize after DOM is loaded
+    // Initialize
     document.addEventListener('DOMContentLoaded', () => {
-      console.log('Checkpoint: DOM fully loaded, initializing app');
+      console.log('Checkpoint: DOM Content Loaded');
       setupEventListeners();
-      setMode('usd-to-pi');
-      updatePiPrice();
       updateRecentCalculations();
+      updatePiPrice();
+      if (isPiBrowser()) {
+        console.log('Checkpoint: Pi Browser detected, preloading Pi SDK...');
+        loadSdk(sdkUrls[0]).catch(error => {
+          console.error('Checkpoint: Preload SDK error:', {
+            message: error.message || 'Unknown error',
+            stack: error.stack
+          });
+        });
+      }
     });
   </script>
 </body>
