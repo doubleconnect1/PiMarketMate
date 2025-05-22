@@ -179,7 +179,7 @@
     let currentMode = 'usd-to-pi';
     let lastPiPrices = {
       AFN: null, ALL: null, DZD: null, EUR: null, AOA: null, XCD: null, ARS: null, AMD: null, AUD: null, AZN: null,
-      BSD: null, BHD: null, BDT: null, BBB: null, BYN: null, BZD: null, XOF: null, BTN: null, BOB: null, BAM: null,
+      BSD: null, BHD: null, BDT: null, BBD: null, BYN: null, BZD: null, XOF: null, BTN: null, BOB: null, BAM: null,
       BWP: null, BRL: null, BND: null, BGN: null, BIF: null, KHR: null, XAF: null, CAD: null, CVE: null, CLP: null,
       CNY: null, COP: null, KMF: null, CDF: null, CRC: null, HRK: null, CUP: null, CZK: null, DKK: null, DJF: null,
       DOP: null, USD: null, EGP: null, ERN: null, ETB: null, FJD: null, GMD: null, GEL: null, GHS: null, GTQ: null,
@@ -341,24 +341,60 @@
 
     async function checkPiServer() {
       console.log('Checking Pi Network Testnet server availability...');
-      try {
-        const response = await fetch('https://api.testnet.minepi.com/v2/payments', {
-          method: 'GET',
-          headers: {
-            'Authorization': 'Key xxphzwyfmzalumwmiewge3hshjos3dsqwemu1hyuerpiomyff97grrsgxfvhpzdq'
-          },
-          timeout: 5000
-        });
-        console.log('Pi Network Testnet server ping:', {
-          status: response.status,
-          ok: response.ok,
-          isAvailable: response.ok || response.status === 401 || response.status === 403
-        });
-        return response.ok || response.status === 401 || response.status === 403;
-      } catch (error) {
-        console.error('Pi Network Testnet server ping failed:', error.message || 'Unknown error', error);
-        return false;
+      const endpoints = [
+        { url: 'https://api.testnet.minepi.com/v2/payments', critical: true },
+        { url: 'https://api.testnet.minepi.com/v2/me', critical: false }
+      ];
+
+      for (const endpoint of endpoints) {
+        console.log(`Pinging endpoint: ${endpoint.url}`);
+        try {
+          const response = await fetch(endpoint.url, {
+            method: 'GET',
+            headers: {
+              'Authorization': 'Key xxphzwyfmzalumwmiewge3hshjos3dsqwemu1hyuerpiomyff97grrsgxfvhpzdq'
+            },
+            signal: AbortSignal.timeout(5000)
+          });
+          const responseDetails = {
+            url: endpoint.url,
+            status: response.status,
+            ok: response.ok,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries())
+          };
+          let responseBody = 'No body';
+          try {
+            responseBody = await response.text();
+          } catch (e) {
+            console.warn(`Failed to read response body for ${endpoint.url}:`, e);
+          }
+          console.log('Pi Network Testnet server ping:', {
+            ...responseDetails,
+            body: responseBody,
+            isAvailable: response.ok || [401, 403, 429].includes(response.status)
+          });
+          if (response.ok || [401, 403, 429].includes(response.status)) {
+            return true;
+          }
+          if (endpoint.critical) {
+            console.warn(`Critical endpoint ${endpoint.url} failed with status ${response.status}`);
+            return false;
+          }
+        } catch (error) {
+          console.error(`Pi Network Testnet server ping failed for ${endpoint.url}:`, {
+            message: error.message || 'Unknown error',
+            code: error.code,
+            cause: error.cause,
+            stack: error.stack
+          });
+          if (endpoint.critical) {
+            return false;
+          }
+        }
       }
+      console.warn('All endpoints failed, but allowing payment to proceed as non-critical.');
+      return true;
     }
 
     async function fetchPiPrice(currency) {
@@ -553,8 +589,10 @@
         console.log('Checking Pi Network Testnet server availability...');
         const serverAvailable = await checkPiServer();
         if (!serverAvailable) {
-          showError('Pi Network Testnet servers are unavailable. Please try again later.');
-          return;
+          console.warn('Pi Network Testnet servers may be unavailable, proceeding with payment attempt.');
+          showError('Warning: Pi Network Testnet servers may be unavailable, but attempting payment.');
+        } else {
+          console.log('Pi Network Testnet servers are available.');
         }
         console.log('Authenticating user...');
         let authResult;
@@ -618,7 +656,7 @@
               }
               console.log('Payment completed successfully');
               saveCalculation(amount, amount, true);
-              showError('Payment successful! Transaction ID: ' + txid); // Note: This should be a success message
+              alert('Payment successful! Transaction ID: ' + txid);
             } catch (error) {
               console.error('Server completion error:', error.message || 'Unknown error', error);
               showError('Payment completion failed: ' + (error.message || 'Unknown error'));
