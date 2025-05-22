@@ -1,5 +1,43 @@
-```html
-<!DOCTYPE html>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -11,8 +49,6 @@
 <body class="bg-gray-100 font-sans">
   <div class="container mx-auto p-4 max-w-lg">
     <h1 class="text-2xl font-bold mb-4 text-center">Pi Market Mate</h1>
-
-    <!-- Currency Selection -->
     <div class="mb-4">
       <label for="currency" class="block text-sm font-medium text-gray-700">1. SELECT CURRENCY:</label>
       <select id="currency" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
@@ -24,61 +60,39 @@
       </select>
       <span id="currency-check" class="hidden text-green-500 text-sm mt-1">✓ Valid currency</span>
     </div>
-
-    <!-- Mode Toggle -->
     <div class="mb-4 flex space-x-2">
       <button id="usd-to-pi-btn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">Currency to Pi</button>
       <button id="pi-to-usd-btn" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition">Pi to Currency</button>
     </div>
-
-    <!-- Amount Input -->
     <div class="mb-4">
       <label id="input-label-text" class="block text-sm font-medium text-gray-700">2. ENTER AMOUNT (USD):</label>
       <input id="amount" type="number" step="0.01" min="0" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., 100">
       <span id="amount-check" class="hidden text-green-500 text-sm mt-1">✓ Valid amount</span>
     </div>
-
-    <!-- Pi Price -->
     <div class="mb-4">
       <p class="text-sm">Current Pi Price: <span id="pi-price" class="font-medium">Loading...</span></p>
       <label for="manual-price" class="block text-sm font-medium text-gray-700 mt-2">Manual Price (optional):</label>
       <input id="manual-price" type="number" step="0.0001" min="0" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., 0.1234">
     </div>
-
-    <!-- Calculate Button -->
     <button id="calculate-btn" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition mb-4">Calculate</button>
-
-    <!-- Result -->
     <div id="result" class="hidden mb-4 p-4 bg-blue-100 rounded-md">
       <span id="result-text-prefix" class="font-medium"></span>
       <span id="result-value" class="font-bold"></span>
     </div>
-
-    <!-- Error Message -->
     <div id="error" class="hidden mb-4 p-4 bg-red-100 text-red-600 rounded-md">
       <span id="error-message"></span>
     </div>
-
-    <!-- Pay with Pi -->
     <button id="pay-with-pi-btn" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition mb-4">Pay with Pi</button>
-
-    <!-- Debug Button -->
     <button id="debug-btn" class="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition mb-4">Debug Pi SDK</button>
-
-    <!-- Debug Panel -->
     <div id="debug-panel" class="hidden mb-4 p-4 bg-gray-200 rounded-md">
       <h2 class="text-lg font-semibold text-gray-700">Debug Info</h2>
       <pre id="debug-content" class="whitespace-pre-wrap text-sm text-gray-600"></pre>
       <button id="close-debug" class="mt-2 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition">Close</button>
     </div>
-
-    <!-- Recent Calculations -->
     <div class="mb-6">
       <h2 class="text-lg font-semibold text-gray-700">Recent Calculations</h2>
       <ul id="recent-calculations" class="list-disc pl-5 text-sm text-gray-600"></ul>
     </div>
-
-    <!-- Donation -->
     <div class="mb-4 text-center">
       <a id="donation-link" href="#" class="text-blue-600 hover:underline">Donate to Pi Market Mate</a>
     </div>
@@ -95,8 +109,6 @@
         <button id="cancel-donation" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition">Cancel</button>
       </div>
     </div>
-
-    <!-- Text Viewer -->
     <div id="text-viewer" class="hidden mt-4 p-4 bg-gray-50 rounded-md">
       <pre id="text-content" class="whitespace-pre-wrap text-sm"></pre>
       <div id="text-fallback" class="hidden text-red-600 text-sm"></div>
@@ -105,8 +117,6 @@
         <button id="close-text" class="ml-4 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 transition">Close</button>
       </div>
     </div>
-
-    <!-- Footer Links -->
     <div class="mt-6 text-center text-sm">
       <a id="privacy-policy-link" href="#" class="text-blue-600 hover:underline">Privacy Policy</a>
       <span class="mx-2">|</span>
@@ -231,7 +241,6 @@
         }
 
         console.log('Checkpoint: Pi SDK object properties:', Object.keys(window.Pi));
-        // Accept either isReady or initialized as true
         const isReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
                         (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
         console.log('Checkpoint: Initial SDK ready check:', { isReady, isReadyValue: window.Pi.isReady, initialized: window.Pi.initialized });
@@ -243,30 +252,8 @@
         let retries = 0;
         let hasResolved = false;
         const versions = ['1.0', '2.0'];
-        let useSandbox = true;
-
-        // Check Testnet health to decide sandbox mode
-        try {
-          console.log('Checkpoint: Checking Testnet health before initialization...');
-          const response = await fetch('https://api.testnet.minepi.com/v2/health', {
-            method: 'GET',
-            headers: {
-              'Authorization': 'Key xxphzwyfmzalumwmiewge3hshjos3dsqwemu1hyuerpiomyff97grrsgxfvhpzdq'
-            },
-            signal: AbortSignal.timeout(5000)
-          });
-          if (!response.ok) {
-            console.warn('Checkpoint: Testnet health check failed:', response.status, response.statusText);
-            useSandbox = false;
-          }
-        } catch (error) {
-          console.warn('Checkpoint: Testnet health check error:', {
-            message: error.message || 'Unknown error',
-            stack: error.stack
-          });
-          useSandbox = false;
-        }
-        console.log('Checkpoint: Using sandbox mode:', useSandbox);
+        const useSandbox = false; // Force non-sandbox mode
+        console.log('Checkpoint: Forcing non-sandbox mode due to Testnet issues');
 
         async function tryInit(version, sandbox) {
           console.log(`Checkpoint: Attempting Pi.init with version ${version}, sandbox: ${sandbox}`);
@@ -289,47 +276,15 @@
           }
         }
 
-        // Try all versions with and without sandbox
         for (let version of versions) {
-          for (let sandbox of [useSandbox, false]) {
-            if (await tryInit(version, sandbox)) {
-              if (!hasResolved) {
-                hasResolved = true;
-                const postInitReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
-                                      (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
-                console.log('Checkpoint: Post-init Pi SDK ready state (version:', version, ', sandbox:', sandbox, '):', postInitReady);
-                return postInitReady;
-              }
+          if (await tryInit(version, useSandbox)) {
+            if (!hasResolved) {
+              hasResolved = true;
+              const postInitReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
+                                    (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
+              console.log('Checkpoint: Post-init Pi SDK ready state (version:', version, ', sandbox:', useSandbox, '):', postInitReady);
+              return postInitReady;
             }
-          }
-        }
-
-        // Force SDK reload if all init attempts fail
-        console.log('Checkpoint: All init attempts failed, forcing SDK reload...');
-        sdkLoadAttempts++;
-        if (sdkLoadAttempts < maxAttempts) {
-          console.log(`Checkpoint: Reloading SDK with URL ${sdkUrls[sdkLoadAttempts]}`);
-          try {
-            await loadSdk(sdkUrls[sdkLoadAttempts]);
-            // Try both sandbox and non-sandbox
-            for (let version of versions) {
-              for (let sandbox of [true, false]) {
-                if (await tryInit(version, sandbox)) {
-                  if (!hasResolved) {
-                    hasResolved = true;
-                    const postInitReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
-                                          (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
-                    console.log('Checkpoint: Post-reload init Pi SDK ready state:', postInitReady);
-                    return postInitReady;
-                  }
-                }
-              }
-            }
-          } catch (err) {
-            console.error(`Checkpoint: SDK reload attempt ${sdkLoadAttempts}/${maxAttempts} failed:`, {
-              message: err.message || 'Unknown error',
-              stack: err.stack
-            });
           }
         }
 
@@ -362,19 +317,17 @@
 
             console.log(`Checkpoint: Pi SDK not ready, retrying (${retries + 1}/${maxRetries})...`);
             for (let version of versions) {
-              for (let sandbox of [useSandbox, false]) {
-                if (await tryInit(version, sandbox)) {
-                  if (!hasResolved) {
-                    hasResolved = true;
-                    const postRetryReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
-                                           (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
-                    console.log('Checkpoint: Post-retry Pi SDK ready state:', postRetryReady);
-                    clearInterval(retryInterval);
-                    clearTimeout(timeoutTimer);
-                    resolve(postRetryReady);
-                  }
-                  return;
+              if (await tryInit(version, useSandbox)) {
+                if (!hasResolved) {
+                  hasResolved = true;
+                  const postRetryReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
+                                         (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
+                  console.log('Checkpoint: Post-retry Pi SDK ready state:', postRetryReady);
+                  clearInterval(retryInterval);
+                  clearTimeout(timeoutTimer);
+                  resolve(postRetryReady);
                 }
+                return;
               }
             }
             retries++;
@@ -413,7 +366,7 @@
           createPaymentExists: typeof window.Pi.createPayment === 'function'
         } : {},
         appId: 'marketmate',
-        sandbox: true,
+        sandbox: false,
         userAgent: navigator.userAgent,
         sdkUrls: sdkUrls,
         sdkLoadError: 'None',
@@ -765,42 +718,30 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
         console.log('Checkpoint: Authenticating user...');
         let authResult;
         const authAttempts = 2;
+        const scopeOptions = [['payments'], []];
         for (let attempt = 1; attempt <= authAttempts; attempt++) {
-          try {
-            console.log(`Checkpoint: Authentication attempt ${attempt}/${authAttempts}`);
-            authResult = await window.Pi.authenticate(['payments', 'username'], (payment) => {
-              console.log('Checkpoint: Incomplete payment found:', payment);
-            });
-            console.log('Checkpoint: User authenticated:', authResult);
-            break;
-          } catch (authErr) {
-            console.error(`Checkpoint: Authentication attempt ${attempt} failed:`, {
-              message: authErr.message || 'Unknown authentication error',
-              stack: authErr.stack
-            });
-            if (authErr.message && authErr.message.includes('e.every')) {
-              console.log('Checkpoint: Retrying authentication without scopes...');
-              try {
-                authResult = await window.Pi.authenticate({}, (payment) => {
-                  console.log('Checkpoint: Incomplete payment found (fallback):', payment);
-                });
-                console.log('Checkpoint: User authenticated (fallback):', authResult);
-                break;
-              } catch (fallbackErr) {
-                console.error('Checkpoint: Fallback authentication failed:', {
-                  message: fallbackErr.message || 'Unknown error',
-                  stack: fallbackErr.stack
-                });
-                if (attempt === authAttempts) {
-                  throw new Error('Authentication failed: ' + (fallbackErr.message || 'Unknown error'));
-                }
-              }
-            } else {
-              if (attempt === authAttempts) {
+          for (let scopes of scopeOptions) {
+            try {
+              console.log(`Checkpoint: Authentication attempt ${attempt}/${authAttempts} with scopes:`, scopes);
+              authResult = await window.Pi.authenticate(scopes, (payment) => {
+                console.log('Checkpoint: Incomplete payment found:', payment);
+              });
+              console.log('Checkpoint: User authenticated:', authResult);
+              break;
+            } catch (authErr) {
+              console.error(`Checkpoint: Authentication attempt ${attempt} failed with scopes ${JSON.stringify(scopes)}:`, {
+                message: authErr.message || 'Unknown authentication error',
+                stack: authErr.stack
+              });
+              if (attempt === authAttempts && scopes.length === 0) {
                 throw new Error('Authentication failed: ' + (authErr.message || 'Unknown error'));
               }
             }
           }
+          if (authResult) break;
+        }
+        if (!authResult) {
+          throw new Error('Authentication failed after all attempts');
         }
 
         console.log(`Checkpoint: Initiating payment for ${amount} Pi...`);
@@ -813,28 +754,11 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
           onReadyForServerApproval: async (paymentId) => {
             console.log('Checkpoint: Payment ID ready for approval:', paymentId);
             try {
-              const response = await fetch('/api/payments/approve', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paymentId })
-              });
-              const responseDetails = {
-                status: response.status,
-                ok: response.ok,
-                statusText: response.statusText,
-                headers: Object.fromEntries(response.headers.entries())
-              };
-              let responseBody = 'No body';
-              try {
-                responseBody = await response.text();
-              } catch (e) {
-                console.warn('Checkpoint: Failed to read approval response body:', e);
-              }
-              console.log('Checkpoint: Approval response:', { ...responseDetails, body: responseBody });
-              if (!response.ok) {
-                throw new Error(`Server approval failed: ${response.status} ${response.statusText}`);
-              }
-              console.log('Checkpoint: Payment approved by server');
+              // Mock server approval
+              console.log('Checkpoint: Mocking server approval for payment:', paymentId);
+              const response = { ok: true, status: 200, statusText: 'OK', text: () => Promise.resolve('Mock approval') };
+              console.log('Checkpoint: Approval response (mocked):', response);
+              console.log('Checkpoint: Payment approved by server (mocked)');
             } catch (error) {
               console.error('Checkpoint: Server approval error:', {
                 message: error.message || 'Unknown error',
@@ -846,28 +770,11 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
           onReadyForServerCompletion: async (paymentId, txid) => {
             console.log('Checkpoint: Payment ready for completion:', paymentId, 'txid:', txid);
             try {
-              const response = await fetch('/api/payments/complete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paymentId, txid })
-              });
-              const responseDetails = {
-                status: response.status,
-                ok: response.ok,
-                statusText: response.statusText,
-                headers: Object.fromEntries(response.headers.entries())
-              };
-              let responseBody = 'No body';
-              try {
-                responseBody = await response.text();
-              } catch (e) {
-                console.warn('Checkpoint: Failed to read completion response body:', e);
-              }
-              console.log('Checkpoint: Completion response:', { ...responseDetails, body: responseBody });
-              if (!response.ok) {
-                throw new Error(`Server completion failed: ${response.status} ${response.statusText}`);
-              }
-              console.log('Checkpoint: Payment completed successfully');
+              // Mock server completion
+              console.log('Checkpoint: Mocking server completion for payment:', paymentId, 'txid:', txid);
+              const response = { ok: true, status: 200, statusText: 'OK', text: () => Promise.resolve('Mock completion') };
+              console.log('Checkpoint: Completion response (mocked):', response);
+              console.log('Checkpoint: Payment completed successfully (mocked)');
               saveCalculation(amount, amount, true);
               alert('Payment successful! Transaction ID: ' + txid);
             } catch (error) {
@@ -895,7 +802,7 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
         try {
           const paymentPromise = window.Pi.createPayment(paymentData, paymentCallbacks);
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Payment creation timed out after 30s')), 30000);
+            setTimeout(() => reject(new Error('Payment creation timed out after 60s')), 60000);
           });
           const payment = await Promise.race([paymentPromise, timeoutPromise]);
           console.log('Checkpoint: Payment created:', payment);
