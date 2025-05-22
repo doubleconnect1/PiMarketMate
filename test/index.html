@@ -343,7 +343,8 @@
       console.log('Checking Pi Network Testnet server availability...');
       const endpoints = [
         { url: 'https://api.testnet.minepi.com/v2/payments', critical: true },
-        { url: 'https://api.testnet.minepi.com/v2/me', critical: false }
+        { url: 'https://api.testnet.minepi.com/v2/me', critical: false },
+        { url: 'https://api.testnet.minepi.com/v2/health', critical: false }
       ];
 
       for (const endpoint of endpoints) {
@@ -354,7 +355,7 @@
             headers: {
               'Authorization': 'Key xxphzwyfmzalumwmiewge3hshjos3dsqwemu1hyuerpiomyff97grrsgxfvhpzdq'
             },
-            signal: AbortSignal.timeout(5000)
+            signal: AbortSignal.timeout(8000)
           });
           const responseDetails = {
             url: endpoint.url,
@@ -372,9 +373,9 @@
           console.log('Pi Network Testnet server ping:', {
             ...responseDetails,
             body: responseBody,
-            isAvailable: response.ok || [401, 403, 429].includes(response.status)
+            isAvailable: response.ok || [401, 403, 429, 503, 500].includes(response.status)
           });
-          if (response.ok || [401, 403, 429].includes(response.status)) {
+          if (response.ok || [401, 403, 429, 503, 500].includes(response.status)) {
             return true;
           }
           if (endpoint.critical) {
@@ -596,26 +597,36 @@
         }
         console.log('Authenticating user...');
         let authResult;
-        try {
-          authResult = await window.Pi.authenticate(['payments', 'username'], (payment) => {
-            console.log('Incomplete payment found:', payment);
-          });
-          console.log('User authenticated:', authResult);
-        } catch (authErr) {
-          console.error('Authentication error:', authErr.message || 'Unknown authentication error', authErr);
-          if (authErr.message && authErr.message.includes('e.every')) {
-            console.log('Retrying authentication without scopes...');
-            try {
-              authResult = await window.Pi.authenticate({}, (payment) => {
-                console.log('Incomplete payment found (fallback):', payment);
-              });
-              console.log('User authenticated (fallback):', authResult);
-            } catch (fallbackErr) {
-              console.error('Fallback authentication failed:', fallbackErr.message || 'Unknown error', fallbackErr);
-              throw new Error(`Authentication failed: ${fallbackErr.message || 'Unknown error'}`);
+        const authAttempts = serverAvailable ? 1 : 2; // Retry if server is unavailable
+        for (let attempt = 1; attempt <= authAttempts; attempt++) {
+          try {
+            console.log(`Authentication attempt ${attempt}/${authAttempts}`);
+            authResult = await window.Pi.authenticate(['payments', 'username'], (payment) => {
+              console.log('Incomplete payment found:', payment);
+            });
+            console.log('User authenticated:', authResult);
+            break;
+          } catch (authErr) {
+            console.error(`Authentication attempt ${attempt} failed:`, authErr.message || 'Unknown authentication error', authErr);
+            if (authErr.message && authErr.message.includes('e.every')) {
+              console.log('Retrying authentication without scopes...');
+              try {
+                authResult = await window.Pi.authenticate({}, (payment) => {
+                  console.log('Incomplete payment found (fallback):', payment);
+                });
+                console.log('User authenticated (fallback):', authResult);
+                break;
+              } catch (fallbackErr) {
+                console.error('Fallback authentication failed:', fallbackErr.message || 'Unknown error', fallbackErr);
+                if (attempt === authAttempts) {
+                  throw new Error(`Authentication failed: ${fallbackErr.message || 'Unknown error'}`);
+                }
+              }
+            } else {
+              if (attempt === authAttempts) {
+                throw new Error(`Authentication failed: ${authErr.message || 'Unknown error'}`);
+              }
             }
-          } else {
-            throw new Error(`Authentication failed: ${authErr.message || 'Unknown error'}`);
           }
         }
         console.log(`Initiating payment for ${amount} Pi...`);
