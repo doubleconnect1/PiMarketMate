@@ -1,0 +1,18 @@
+Pi Market Mate Terms of Service
+
+Last Updated: May 7, 2025
+
+1. Acceptance of Terms
+By using Pi Market Mate, you agree to these Terms of Service. If you do not agree, please do not use the application.
+
+2. Use of Service
+Pi Market Mate allows you to convert currencies to Pi using CoinGecko's official Pi price. You are responsible for ensuring the accuracy of the data you input.
+
+3. Limitation of Liability
+Pi Market Mate is provided "as is" without warranties of any kind. We are not liable for any damages arising from the use of this service.
+
+4. Changes to Terms
+We may update these Terms of Service at any time. Continued use of the application after changes constitutes acceptance of the new terms.
+
+5. Contact Us
+For questions, contact us at support@pimarketmate.com.
