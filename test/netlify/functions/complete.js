@@ -1,10 +1,10 @@
 const axios = require('axios');
 exports.handler = async (event) => {
-  const { paymentId } = JSON.parse(event.body);
+  const { paymentId, txid } = JSON.parse(event.body);
   try {
     const response = await axios.post(
-      'https://api.testnet.minepi.com/v2/payments/approve',
-      { paymentId },
+      'https://api.testnet.minepi.com/v2/payments/complete',
+      { paymentId, txid },
       {
         headers: {
           Authorization: `Key ${process.env.PI_API_KEY}`,
@@ -17,7 +17,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ success: true }),
     };
   } catch (error) {
-    console.error('Approval error:', error.response ? error.response.data : error.message);
+    console.error('Completion error:', error.response ? error.response.data : error.message);
     return {
       statusCode: 400,
       body: JSON.stringify({ error: error.message }),
