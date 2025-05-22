@@ -269,25 +269,55 @@
         }
 
         console.log('Checkpoint: Pi SDK object properties:', Object.keys(window.Pi));
-        const isReady = typeof window.Pi.isReady === 'boolean' ? window.Pi.isReady : false;
+        const isReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
+                        (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
         if (isReady) {
-          console.log('Checkpoint: Pi SDK is ready on initial check');
+          console.log('Checkpoint: Pi SDK is ready on initial check (isReady:', window.Pi.isReady, ', initialized:', window.Pi.initialized, ')');
           return true;
         }
 
         let retries = 0;
         let hasResolved = false;
         const versions = ['1.0', '2.0'];
+        let useSandbox = true;
+
+        // Check Testnet health to decide sandbox mode
+        try {
+          console.log('Checkpoint: Checking Testnet health before initialization...');
+          const response = await fetch('https://api.testnet.minepi.com/v2/health', {
+            method: 'GET',
+            headers: {
+              'Authorization': 'Key xxphzwyfmzalumwmiewge3hshjos3dsqwemu1hyuerpiomyff97grrsgxfvhpzdq'
+            },
+            signal: AbortSignal.timeout(5000)
+          });
+          if (!response.ok) {
+            console.warn('Checkpoint: Testnet health check failed:', response.status, response.statusText);
+            useSandbox = false;
+          }
+        } catch (error) {
+          console.warn('Checkpoint: Testnet health check error:', {
+            message: error.message || 'Unknown error',
+            stack: error.stack
+          });
+          useSandbox = false;
+        }
+        console.log('Checkpoint: Using sandbox mode:', useSandbox);
 
         async function tryInit(version) {
-          console.log(`Checkpoint: Attempting Pi.init with version ${version}`);
+          console.log(`Checkpoint: Attempting Pi.init with version ${version}, sandbox: ${useSandbox}`);
           try {
-            await window.Pi.init({ version, appId: 'marketmate', sandbox: true });
-            console.log(`Checkpoint: Pi SDK initialized successfully with version ${version} (Testnet)`);
-            console.log('Checkpoint: Post-init Pi SDK properties:', Object.keys(window.Pi));
-            return true;
+            await window.Pi.init({ version, appId: 'marketmate', sandbox: useSandbox });
+            const postInitReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
+                                  (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
+            console.log(`Checkpoint: Pi.init completed with version ${version} (sandbox: ${useSandbox})`, {
+              isReady: window.Pi.isReady,
+              initialized: window.Pi.initialized,
+              postInitReady
+            });
+            return postInitReady;
           } catch (error) {
-            console.error(`Checkpoint: Pi.init failed with version ${version}:`, {
+            console.error(`Checkpoint: Pi.init failed with version ${version} (sandbox: ${useSandbox}):`, {
               message: error.message || 'Unknown error',
               stack: error.stack
             });
@@ -295,27 +325,94 @@
           }
         }
 
+        // Try all versions with sandbox
         for (let version of versions) {
           if (await tryInit(version)) {
             if (!hasResolved) {
               hasResolved = true;
-              const postInitReady = typeof window.Pi.isReady === 'boolean' ? window.Pi.isReady : false;
+              const postInitReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
+                                    (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
               console.log('Checkpoint: Post-init Pi SDK ready state:', postInitReady);
               return postInitReady;
             }
           }
         }
 
+        // If sandbox failed, try without sandbox
+        if (useSandbox) {
+          console.log('Checkpoint: Sandbox init failed, trying without sandbox...');
+          useSandbox = false;
+          for (let version of versions) {
+            if (await tryInit(version)) {
+              if (!hasResolved) {
+                hasResolved = true;
+                const postInitReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
+                                      (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
+                console.log('Checkpoint: Post-init Pi SDK ready state (no sandbox):', postInitReady);
+                return postInitReady;
+              }
+            }
+          }
+        }
+
+        // Force SDK reload if all init attempts fail
+        console.log('Checkpoint: All init attempts failed, forcing SDK reload...');
+        sdkLoadAttempts++;
+        if (sdkLoadAttempts < maxAttempts) {
+          console.log(`Checkpoint: Reloading SDK with URL ${sdkUrls[sdkLoadAttempts]}`);
+          try {
+            await loadSdk(sdkUrls[sdkLoadAttempts]);
+            // Reset useSandbox for new attempt
+            useSandbox = true;
+            try {
+              const response = await fetch('https://api.testnet.minepi.com/v2/health', {
+                method: 'GET',
+                headers: {
+                  'Authorization': 'Key xxphzwyfmzalumwmiewge3hshjos3dsqwemu1hyuerpiomyff97grrsgxfvhpzdq'
+                },
+                signal: AbortSignal.timeout(5000)
+              });
+              if (!response.ok) {
+                console.warn('Checkpoint: Testnet health check failed after reload:', response.status, response.statusText);
+                useSandbox = false;
+              }
+            } catch (error) {
+              console.warn('Checkpoint: Testnet health check error after reload:', {
+                message: error.message || 'Unknown error',
+                stack: error.stack
+              });
+              useSandbox = false;
+            }
+            for (let version of versions) {
+              if (await tryInit(version)) {
+                if (!hasResolved) {
+                  hasResolved = true;
+                  const postInitReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
+                                        (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
+                  console.log('Checkpoint: Post-reload init Pi SDK ready state:', postInitReady);
+                  return postInitReady;
+                }
+              }
+            }
+          } catch (err) {
+            console.error(`Checkpoint: SDK reload attempt ${sdkLoadAttempts}/${maxAttempts} failed:`, {
+              message: err.message || 'Unknown error',
+              stack: err.stack
+            });
+          }
+        }
+
         console.log('Checkpoint: Starting retry loop for Pi SDK initialization');
         return new Promise((resolve, reject) => {
           const retryInterval = setInterval(async () => {
-            const currentReady = typeof window.Pi.isReady === 'boolean' ? window.Pi.isReady : false;
+            const currentReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
+                                 (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
             if (currentReady) {
               if (!hasResolved) {
                 hasResolved = true;
                 clearInterval(retryInterval);
                 clearTimeout(timeoutTimer);
-                console.log(`Checkpoint: Pi SDK is ready after ${retries} retries`);
+                console.log(`Checkpoint: Pi SDK is ready after ${retries} retries (isReady: ${window.Pi.isReady}, initialized: ${window.Pi.initialized})`);
                 resolve(true);
               }
               return;
@@ -337,7 +434,8 @@
               if (await tryInit(version)) {
                 if (!hasResolved) {
                   hasResolved = true;
-                  const postRetryReady = typeof window.Pi.isReady === 'boolean' ? window.Pi.isReady : false;
+                  const postRetryReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
+                                         (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
                   console.log('Checkpoint: Post-retry Pi SDK ready state:', postRetryReady);
                   clearInterval(retryInterval);
                   clearTimeout(timeoutTimer);
@@ -374,13 +472,21 @@
         isPiBrowser: isPiBrowser(),
         windowPiExists: !!window.Pi,
         piIsReady: typeof window.Pi?.isReady === 'boolean' ? window.Pi.isReady : 'undefined',
+        piInitialized: typeof window.Pi?.initialized === 'boolean' ? window.Pi.initialized : 'undefined',
         piSdkProperties: window.Pi ? Object.keys(window.Pi) : [],
+        piSdkDetails: window.Pi ? {
+          initExists: typeof window.Pi.init === 'function',
+          authenticateExists: typeof window.Pi.authenticate === 'function',
+          createPaymentExists: typeof window.Pi.createPayment === 'function'
+        } : {},
         appId: 'marketmate',
         sandbox: true,
         userAgent: navigator.userAgent,
-        sdkUrls: sdkUrls
+        sdkUrls: sdkUrls,
+        sdkLoadError: 'None',
+        sdkInitError: 'None'
       };
-      console.log('Pi SDK Debug Info:', debugInfo);
+      console.log('Initial Pi SDK Debug Info:', debugInfo);
 
       try {
         console.log('Checkpoint: Attempting to ping Testnet server...');
@@ -409,7 +515,7 @@
         };
       }
 
-      console.log('Updated Pi SDK Debug Info:', debugInfo);
+      console.log('Updated Pi SDK Debug Info (post-Testnet):', debugInfo);
 
       if (!debugInfo.windowPiExists) {
         console.log('Checkpoint: Attempting to load Pi SDK...');
@@ -417,7 +523,13 @@
           await loadSdk(sdkUrls[0]);
           debugInfo.windowPiExists = !!window.Pi;
           debugInfo.piIsReady = typeof window.Pi?.isReady === 'boolean' ? window.Pi.isReady : 'undefined';
+          debugInfo.piInitialized = typeof window.Pi?.initialized === 'boolean' ? window.Pi.initialized : 'undefined';
           debugInfo.piSdkProperties = window.Pi ? Object.keys(window.Pi) : [];
+          debugInfo.piSdkDetails = window.Pi ? {
+            initExists: typeof window.Pi.init === 'function',
+            authenticateExists: typeof window.Pi.authenticate === 'function',
+            createPaymentExists: typeof window.Pi.createPayment === 'function'
+          } : {};
           console.log('Post-load Pi SDK Debug Info:', debugInfo);
         } catch (error) {
           console.error('Checkpoint: Debug SDK load failed:', {
@@ -428,22 +540,23 @@
         }
       }
 
-      if (debugInfo.windowPiExists && debugInfo.piIsReady === 'undefined') {
-        console.warn('Checkpoint: Pi SDK loaded but isReady is undefined, inspecting SDK...');
-        debugInfo.piSdkDetails = {
-          initExists: typeof window.Pi.init === 'function',
-          authenticateExists: typeof window.Pi.authenticate === 'function',
-          createPaymentExists: typeof window.Pi.createPayment === 'function'
-        };
+      if (debugInfo.windowPiExists && (debugInfo.piIsReady === 'undefined' || debugInfo.piInitialized === 'undefined' || !window.Pi.isReady && !window.Pi.initialized)) {
+        console.warn('Checkpoint: Pi SDK loaded but not ready/initialized, inspecting SDK...');
         console.log('Checkpoint: Pi SDK details:', debugInfo.piSdkDetails);
       }
 
-      if (debugInfo.windowPiExists && debugInfo.piIsReady !== true) {
+      if (debugInfo.windowPiExists && (debugInfo.piIsReady !== true && debugInfo.piInitialized !== true)) {
         console.log('Checkpoint: Attempting to initialize Pi SDK...');
         try {
           const isReady = await ensurePiSDKReady();
           debugInfo.piIsReady = typeof window.Pi?.isReady === 'boolean' ? window.Pi.isReady : 'undefined';
+          debugInfo.piInitialized = typeof window.Pi?.initialized === 'boolean' ? window.Pi.initialized : 'undefined';
           debugInfo.piSdkProperties = window.Pi ? Object.keys(window.Pi) : [];
+          debugInfo.piSdkDetails = window.Pi ? {
+            initExists: typeof window.Pi.init === 'function',
+            authenticateExists: typeof window.Pi.authenticate === 'function',
+            createPaymentExists: typeof window.Pi.createPayment === 'function'
+          } : {};
           console.log('Post-init Pi SDK Debug Info:', debugInfo);
         } catch (error) {
           console.error('Checkpoint: Debug SDK init failed:', {
@@ -467,15 +580,16 @@ Timestamp: ${debugInfo.timestamp}
 Is Pi Browser: ${debugInfo.isPiBrowser}
 Pi SDK Loaded: ${debugInfo.windowPiExists}
 Pi SDK Ready: ${debugInfo.piIsReady}
+Pi SDK Initialized: ${debugInfo.piInitialized}
 Pi SDK Properties: ${JSON.stringify(debugInfo.piSdkProperties, null, 2)}
-Pi SDK Details: ${debugInfo.piSdkDetails ? JSON.stringify(debugInfo.piSdkDetails, null, 2) : 'Not inspected'}
+Pi SDK Details: ${JSON.stringify(debugInfo.piSdkDetails, null, 2)}
 App ID: ${debugInfo.appId}
 Sandbox Mode: ${debugInfo.sandbox}
 User Agent: ${debugInfo.userAgent}
 SDK URLs: ${JSON.stringify(debugInfo.sdkUrls, null, 2)}
 Testnet Health: ${JSON.stringify(debugInfo.testnetHealth, null, 2)}
-SDK Load Error: ${debugInfo.sdkLoadError || 'None'}
-SDK Init Error: ${debugInfo.sdkInitError || 'None'}
+SDK Load Error: ${debugInfo.sdkLoadError}
+SDK Init Error: ${debugInfo.sdkInitError}
         `.trim();
         debugPanel.classList.remove('hidden');
         debugPanel.scrollIntoView({ behavior: 'smooth' });
