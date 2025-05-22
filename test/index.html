@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -184,9 +145,9 @@
     let sdkLoadAttempts = 0;
     const maxAttempts = 3;
     const sdkUrls = [
-      'https://sdk.minepi.com/pi-sdk.js?v=1',
-      'https://sdk.minepi.com/pi-sdk-2.0.0.js?v=1',
-      'https://sdk.minepi.com/pi-sdk-1.0.0.js?v=1'
+      'https://sdk.minepi.com/pi-sdk.js?v=1', // Generic, often latest
+      'https://sdk.minepi.com/pi-sdk-2.0.0.js?v=1', // Specific version
+      'https://sdk.minepi.com/pi-sdk-1.0.0.js?v=1'  // Older specific version
     ];
 
     function loadSdk(url) {
@@ -241,32 +202,32 @@
         }
 
         console.log('Checkpoint: Pi SDK object properties:', Object.keys(window.Pi));
-        const isReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
-                        (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
-        console.log('Checkpoint: Initial SDK ready check:', { isReady, isReadyValue: window.Pi.isReady, initialized: window.Pi.initialized });
-        if (isReady) {
+        const isReadyCheck = () => (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) ||
+                                 (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
+        
+        console.log('Checkpoint: Initial SDK ready check:', { isReady: window.Pi.isReady, initialized: window.Pi.initialized, combined: isReadyCheck() });
+        if (isReadyCheck()) {
           console.log('Checkpoint: Pi SDK is ready on initial check (isReady:', window.Pi.isReady, ', initialized:', window.Pi.initialized, ')');
           return true;
         }
 
         let retries = 0;
         let hasResolved = false;
-        const versions = ['1.0', '2.0'];
-        const useSandbox = false; // Force non-sandbox mode
-        console.log('Checkpoint: Forcing non-sandbox mode due to Testnet issues');
+        const versions = ['2.0', '1.0']; // Prefer newer version for init
+        const useSandbox = false; 
+        console.log('Checkpoint: Forcing non-sandbox mode for Pi.init');
 
         async function tryInit(version, sandbox) {
           console.log(`Checkpoint: Attempting Pi.init with version ${version}, sandbox: ${sandbox}`);
           try {
             await window.Pi.init({ version, appId: 'marketmate', sandbox });
-            const postInitReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
-                                  (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
+            const postInitCombinedReady = isReadyCheck();
             console.log(`Checkpoint: Pi.init completed with version ${version} (sandbox: ${sandbox})`, {
               isReady: window.Pi.isReady,
               initialized: window.Pi.initialized,
-              postInitReady
+              postInitCombinedReady
             });
-            return postInitReady;
+            return postInitCombinedReady;
           } catch (error) {
             console.error(`Checkpoint: Pi.init failed with version ${version} (sandbox: ${sandbox}):`, {
               message: error.message || 'Unknown error',
@@ -280,10 +241,9 @@
           if (await tryInit(version, useSandbox)) {
             if (!hasResolved) {
               hasResolved = true;
-              const postInitReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
-                                    (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
-              console.log('Checkpoint: Post-init Pi SDK ready state (version:', version, ', sandbox:', useSandbox, '):', postInitReady);
-              return postInitReady;
+              const postInitCombinedReady = isReadyCheck();
+              console.log('Checkpoint: Post-init Pi SDK ready state (version:', version, ', sandbox:', useSandbox, '):', postInitCombinedReady);
+              return postInitCombinedReady;
             }
           }
         }
@@ -291,9 +251,8 @@
         console.log('Checkpoint: Starting retry loop for Pi SDK initialization');
         return new Promise((resolve, reject) => {
           const retryInterval = setInterval(async () => {
-            const currentReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
-                                 (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
-            if (currentReady) {
+            const currentCombinedReady = isReadyCheck();
+            if (currentCombinedReady) {
               if (!hasResolved) {
                 hasResolved = true;
                 clearInterval(retryInterval);
@@ -320,12 +279,11 @@
               if (await tryInit(version, useSandbox)) {
                 if (!hasResolved) {
                   hasResolved = true;
-                  const postRetryReady = (typeof window.Pi.isReady === 'boolean' && window.Pi.isReady) || 
-                                         (typeof window.Pi.initialized === 'boolean' && window.Pi.initialized);
-                  console.log('Checkpoint: Post-retry Pi SDK ready state:', postRetryReady);
+                  const postRetryCombinedReady = isReadyCheck();
+                  console.log('Checkpoint: Post-retry Pi SDK ready state:', postRetryCombinedReady);
                   clearInterval(retryInterval);
                   clearTimeout(timeoutTimer);
-                  resolve(postRetryReady);
+                  resolve(postRetryCombinedReady);
                 }
                 return;
               }
@@ -357,32 +315,38 @@
         timestamp: new Date().toISOString(),
         isPiBrowser: isPiBrowser(),
         windowPiExists: !!window.Pi,
-        piIsReady: typeof window.Pi?.isReady === 'boolean' ? window.Pi.isReady : 'undefined',
-        piInitialized: typeof window.Pi?.initialized === 'boolean' ? window.Pi.initialized : 'undefined',
-        piSdkProperties: window.Pi ? Object.keys(window.Pi) : [],
-        piSdkDetails: window.Pi ? {
-          initExists: typeof window.Pi.init === 'function',
-          authenticateExists: typeof window.Pi.authenticate === 'function',
-          createPaymentExists: typeof window.Pi.createPayment === 'function'
-        } : {},
+        piIsReady: 'N/A',
+        piInitialized: 'N/A',
+        piSdkProperties: [],
+        piSdkDetails: {},
         appId: 'marketmate',
-        sandbox: false,
+        sandboxConfigValue: false, // Value intended for Pi.init
+        actualSdkSandboxMode: 'N/A (SDK property not found or not initialized)',
         userAgent: navigator.userAgent,
         sdkUrls: sdkUrls,
         sdkLoadError: 'None',
         sdkInitError: 'None',
-        ensureSdkReadyResult: 'Not tested'
+        ensureSdkReadyResult: 'Not tested yet',
+        testnetHealth: {}
       };
+
+      if(debugInfo.windowPiExists) {
+        debugInfo.piIsReady = typeof window.Pi.isReady === 'boolean' ? window.Pi.isReady : 'undefined';
+        debugInfo.piInitialized = typeof window.Pi.initialized === 'boolean' ? window.Pi.initialized : 'undefined';
+        debugInfo.piSdkProperties = window.Pi ? Object.keys(window.Pi) : [];
+        debugInfo.piSdkDetails = window.Pi ? {
+          initExists: typeof window.Pi.init === 'function',
+          authenticateExists: typeof window.Pi.authenticate === 'function',
+          createPaymentExists: typeof window.Pi.createPayment === 'function'
+        } : {};
+      }
       console.log('Initial Pi SDK Debug Info:', debugInfo);
 
       try {
-        console.log('Checkpoint: Attempting to ping Testnet server...');
+        console.log('Checkpoint: Attempting to ping Testnet server (api.testnet.minepi.com/v2/health)...');
         const response = await fetch('https://api.testnet.minepi.com/v2/health', {
           method: 'GET',
-          headers: {
-            'Authorization': 'Key xxphzwyfmzalumwmiewge3hshjos3dsqwemu1hyuerpiomyff97grrsgxfvhpzdq'
-          },
-          signal: AbortSignal.timeout(5000)
+          signal: AbortSignal.timeout(5000) // 5 seconds timeout
         });
         debugInfo.testnetHealth = {
           status: response.status,
@@ -392,32 +356,34 @@
         try {
           debugInfo.testnetHealth.body = await response.text();
         } catch (e) {
-          debugInfo.testnetHealth.body = 'Failed to read body';
+          debugInfo.testnetHealth.bodyError = e.message || 'Failed to read body';
         }
       } catch (error) {
         debugInfo.testnetHealth = {
           error: error.message || 'Unknown error',
+          name: error.name, // e.g., 'AbortError' for timeout
           code: error.code,
           stack: error.stack
         };
       }
-
-      console.log('Updated Pi SDK Debug Info (post-Testnet):', debugInfo);
+      console.log('Updated Pi SDK Debug Info (post-Testnet check):', debugInfo);
 
       if (!debugInfo.windowPiExists) {
-        console.log('Checkpoint: Attempting to load Pi SDK...');
+        console.log('Checkpoint: Attempting to load Pi SDK for debug...');
         try {
-          await loadSdk(sdkUrls[0]);
+          await loadSdk(sdkUrls[0]); // Attempt to load primary SDK
           debugInfo.windowPiExists = !!window.Pi;
-          debugInfo.piIsReady = typeof window.Pi?.isReady === 'boolean' ? window.Pi.isReady : 'undefined';
-          debugInfo.piInitialized = typeof window.Pi?.initialized === 'boolean' ? window.Pi.initialized : 'undefined';
-          debugInfo.piSdkProperties = window.Pi ? Object.keys(window.Pi) : [];
-          debugInfo.piSdkDetails = window.Pi ? {
-            initExists: typeof window.Pi.init === 'function',
-            authenticateExists: typeof window.Pi.authenticate === 'function',
-            createPaymentExists: typeof window.Pi.createPayment === 'function'
-          } : {};
-          console.log('Post-load Pi SDK Debug Info:', debugInfo);
+          if (window.Pi) {
+            debugInfo.piIsReady = typeof window.Pi.isReady === 'boolean' ? window.Pi.isReady : 'undefined';
+            debugInfo.piInitialized = typeof window.Pi.initialized === 'boolean' ? window.Pi.initialized : 'undefined';
+            debugInfo.piSdkProperties = Object.keys(window.Pi);
+            debugInfo.piSdkDetails = {
+                initExists: typeof window.Pi.init === 'function',
+                authenticateExists: typeof window.Pi.authenticate === 'function',
+                createPaymentExists: typeof window.Pi.createPayment === 'function'
+            };
+          }
+          console.log('Post-load (debug) Pi SDK Debug Info:', debugInfo);
         } catch (error) {
           console.error('Checkpoint: Debug SDK load failed:', {
             message: error.message || 'Unknown error',
@@ -428,19 +394,29 @@
       }
 
       if (debugInfo.windowPiExists) {
-        console.log('Checkpoint: Testing ensurePiSDKReady...');
+        console.log('Checkpoint: Testing ensurePiSDKReady for debug...');
         try {
           const isReady = await ensurePiSDKReady();
           debugInfo.ensureSdkReadyResult = isReady ? 'Success' : 'Failed';
-          debugInfo.piIsReady = typeof window.Pi?.isReady === 'boolean' ? window.Pi.isReady : 'undefined';
-          debugInfo.piInitialized = typeof window.Pi?.initialized === 'boolean' ? window.Pi.initialized : 'undefined';
-          debugInfo.piSdkProperties = window.Pi ? Object.keys(window.Pi) : [];
-          debugInfo.piSdkDetails = window.Pi ? {
-            initExists: typeof window.Pi.init === 'function',
-            authenticateExists: typeof window.Pi.authenticate === 'function',
-            createPaymentExists: typeof window.Pi.createPayment === 'function'
-          } : {};
-          console.log('Post-ensurePiSDKReady Debug Info:', debugInfo);
+          if (window.Pi) { // Re-check properties after ensurePiSDKReady
+            debugInfo.piIsReady = typeof window.Pi.isReady === 'boolean' ? window.Pi.isReady : 'undefined';
+            debugInfo.piInitialized = typeof window.Pi.initialized === 'boolean' ? window.Pi.initialized : 'undefined';
+            debugInfo.piSdkProperties = Object.keys(window.Pi);
+            debugInfo.piSdkDetails = {
+                initExists: typeof window.Pi.init === 'function',
+                authenticateExists: typeof window.Pi.authenticate === 'function',
+                createPaymentExists: typeof window.Pi.createPayment === 'function'
+            };
+            // Attempt to read actual sandbox mode if SDK exposes it
+            if (window.Pi.api && typeof window.Pi.api.IS_SANDBOX === 'boolean') {
+                 debugInfo.actualSdkSandboxMode = window.Pi.api.IS_SANDBOX;
+            } else if (typeof window.Pi.sandbox === 'boolean') { // Check if Pi.sandbox exists directly
+                 debugInfo.actualSdkSandboxMode = window.Pi.sandbox;
+            } else {
+                 debugInfo.actualSdkSandboxMode = 'N/A (property not exposed by SDK)';
+            }
+          }
+          console.log('Post-ensurePiSDKReady (debug) Debug Info:', debugInfo);
         } catch (error) {
           console.error('Checkpoint: Debug ensurePiSDKReady failed:', {
             message: error.message || 'Unknown error',
@@ -462,19 +438,20 @@
         debugContent.textContent = `
 Timestamp: ${debugInfo.timestamp}
 Is Pi Browser: ${debugInfo.isPiBrowser}
-Pi SDK Loaded: ${debugInfo.windowPiExists}
-Pi SDK Ready: ${debugInfo.piIsReady}
-Pi SDK Initialized: ${debugInfo.piInitialized}
+Pi SDK Loaded (window.Pi exists): ${debugInfo.windowPiExists}
+Pi SDK Ready (Pi.isReady raw value): ${debugInfo.piIsReady}
+Pi SDK Initialized (Pi.initialized raw value): ${debugInfo.piInitialized}
 Pi SDK Properties: ${JSON.stringify(debugInfo.piSdkProperties, null, 2)}
-Pi SDK Details: ${JSON.stringify(debugInfo.piSdkDetails, null, 2)}
+Pi SDK Method Existence: ${JSON.stringify(debugInfo.piSdkDetails, null, 2)}
 App ID: ${debugInfo.appId}
-Sandbox Mode: ${debugInfo.sandbox}
+Sandbox Value Passed to Pi.init: ${debugInfo.sandboxConfigValue}
+Actual SDK Sandbox Mode (if detectable): ${debugInfo.actualSdkSandboxMode}
 User Agent: ${debugInfo.userAgent}
-SDK URLs: ${JSON.stringify(debugInfo.sdkUrls, null, 2)}
-Testnet Health: ${JSON.stringify(debugInfo.testnetHealth, null, 2)}
+SDK URLs Tried: ${JSON.stringify(debugInfo.sdkUrls, null, 2)}
+Testnet Health (api.testnet.minepi.com/v2/health): ${JSON.stringify(debugInfo.testnetHealth, null, 2)}
 SDK Load Error: ${debugInfo.sdkLoadError}
 SDK Init Error: ${debugInfo.sdkInitError}
-Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
+Ensure Pi SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
         `.trim();
         debugPanel.classList.remove('hidden');
         debugPanel.scrollIntoView({ behavior: 'smooth' });
@@ -495,8 +472,8 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
           throw new Error(`Failed to fetch Pi price: ${response.status}`);
         }
         const data = await response.json();
-        if (!data['pi-network'][currency.toLowerCase()]) {
-          throw new Error('Currency not supported by CoinGecko');
+        if (!data['pi-network'] || !data['pi-network'][currency.toLowerCase()]) { // Added check for 'pi-network' existence
+          throw new Error('Currency not supported by CoinGecko or pi-network data missing');
         }
         const piPrice = data['pi-network'][currency.toLowerCase()];
         lastPiPrices[currency] = piPrice;
@@ -513,16 +490,21 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
 
     async function updatePiPrice() {
       const manualPriceInput = document.getElementById('manual-price');
+      const piPriceSpan = document.getElementById('pi-price');
       try {
         const piPrice = await fetchPiPrice(currentCurrency);
-        document.getElementById('pi-price').textContent = `${currentCurrency} ${piPrice.toFixed(4)}`;
+        piPriceSpan.textContent = `${currentCurrency} ${piPrice.toFixed(4)}`;
         manualPriceInput.value = piPrice.toFixed(4);
       } catch (error) {
-        document.getElementById('pi-price').textContent = 'Unavailable';
+        piPriceSpan.textContent = 'Unavailable';
         if (lastPiPrices[currentCurrency]) {
           manualPriceInput.value = lastPiPrices[currentCurrency].toFixed(4);
+        } else {
+           manualPriceInput.value = ''; // Clear if no last price
         }
-        showError('Pi price unavailable. Enter a manual price below.');
+        // Don't always show error for price unavailability, manual entry is an option.
+        // showError('Pi price unavailable. Enter a manual price below or try again later.');
+        console.warn('Pi price unavailable. Manual entry or retry needed.');
       }
     }
 
@@ -532,8 +514,8 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
         console.log('Checkpoint: Using manual Pi price:', manualPrice);
         return manualPrice;
       }
-      console.log('Checkpoint: Using last fetched Pi price:', lastPiPrices[currentCurrency]);
-      return lastPiPrices[currentCurrency];
+      console.log('Checkpoint: Using last fetched Pi price for', currentCurrency, ':', lastPiPrices[currentCurrency]);
+      return lastPiPrices[currentCurrency]; // Could be null if fetch failed and no manual price
     }
 
     function calculateAmount(amount, piPrice) {
@@ -542,12 +524,12 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
         showError(`Please enter a valid ${currentMode === 'usd-to-pi' ? currentCurrency : 'Pi'} amount.`);
         return null;
       }
-      if (isNaN(piPrice) || piPrice <= 0) {
-        showError('Pi price is unavailable. Enter a manual price below.');
+      if (piPrice === null || isNaN(piPrice) || piPrice <= 0) { // Check for null from getEffectivePiPrice
+        showError('Pi price is unavailable or invalid. Please fetch or enter a manual price.');
         return null;
       }
       if (currentMode === 'usd-to-pi') {
-        return (amount / piPrice).toFixed(2);
+        return (amount / piPrice).toFixed(2); // Typically Pi amounts are shown with more precision
       } else {
         return (amount * piPrice).toFixed(2);
       }
@@ -559,7 +541,7 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
         mode: currentMode,
         currency: currentCurrency,
         input: parseFloat(input).toFixed(2),
-        result: parseFloat(result).toFixed(2),
+        result: currentMode === 'usd-to-pi' ? parseFloat(result).toFixed(4) : parseFloat(result).toFixed(2), // More precision for Pi
         timestamp: new Date().toLocaleString(),
         paid: paid
       };
@@ -621,38 +603,45 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
       const piToUsdBtn = document.getElementById('pi-to-usd-btn');
       const inputLabelText = document.getElementById('input-label-text');
       const amountCheck = document.getElementById('amount-check');
-      if (usdToPiBtn && piToUsdBtn && inputLabelText && amountCheck) {
+      const amountInput = document.getElementById('amount');
+
+      if (usdToPiBtn && piToUsdBtn && inputLabelText && amountCheck && amountInput) {
         if (mode === 'usd-to-pi') {
           usdToPiBtn.classList.remove('bg-gray-300', 'text-gray-700');
           usdToPiBtn.classList.add('bg-blue-600', 'text-white');
           piToUsdBtn.classList.remove('bg-blue-600', 'text-white');
           piToUsdBtn.classList.add('bg-gray-300', 'text-gray-700');
           inputLabelText.textContent = `2. ENTER AMOUNT (${currentCurrency}):`;
+          amountInput.step = "0.01";
         } else {
           piToUsdBtn.classList.remove('bg-gray-300', 'text-gray-700');
           piToUsdBtn.classList.add('bg-blue-600', 'text-white');
           usdToPiBtn.classList.remove('bg-blue-600', 'text-white');
           usdToPiBtn.classList.add('bg-gray-300', 'text-gray-700');
           inputLabelText.textContent = '2. ENTER AMOUNT (PI):';
+          amountInput.step = "0.0001"; // Allow more precision for Pi input
         }
-        document.getElementById('amount').value = '';
+        amountInput.value = '';
         amountCheck.classList.add('hidden');
         document.getElementById('result')?.classList.add('hidden');
       } else {
-        console.warn('Checkpoint: Mode toggle elements not found:', { usdToPiBtn, piToUsdBtn, inputLabelText, amountCheck });
+        console.warn('Checkpoint: Mode toggle elements not found:', { usdToPiBtn, piToUsdBtn, inputLabelText, amountCheck, amountInput });
       }
     }
 
     function isPiBrowser() {
       const hostname = window.location.hostname.toLowerCase();
       const userAgent = navigator.userAgent.toLowerCase();
-      const isPi = hostname.includes('pinet.com') || hostname.includes('marketmate5838.pinet.com') || hostname.includes('pimarketmate.com') || userAgent.includes('pi browser');
+      // More robust check for Pi Browser, userAgent is key
+      const isPi = userAgent.includes('pi browser') || userAgent.includes('pibrowser');
       console.log('Checkpoint: Pi Browser check:', { isPi, hostname, userAgent });
       return isPi;
     }
 
-    async function initiatePayment(amount, memo, metadata) {
-      console.log('Checkpoint: Initiating payment:', { amount, memo, metadata, timestamp: new Date().toISOString() });
+    async function initiatePayment(amountInPi, memo, metadata) {
+      console.log('Checkpoint: Initiating payment:', { amountInPi, memo, metadata, timestamp: new Date().toISOString() });
+      const numericAmount = parseFloat(amountInPi);
+
       try {
         if (!isPiBrowser()) {
           showError('Please open this app in Pi Browser to make a payment.');
@@ -660,161 +649,159 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
         }
 
         console.log('Checkpoint: Validating payment data...');
-        if (!amount || isNaN(amount) || amount <= 0) {
-          throw new Error('Invalid payment amount');
+        if (isNaN(numericAmount) || numericAmount <= 0) {
+          throw new Error(`Invalid payment amount: ${amountInPi}. Must be a positive number.`);
         }
         if (!memo || typeof memo !== 'string') {
-          throw new Error('Invalid payment memo');
+          throw new Error('Invalid payment memo. Must be a string.');
         }
         if (!metadata || typeof metadata !== 'object') {
-          throw new Error('Invalid payment metadata');
+          throw new Error('Invalid payment metadata. Must be an object.');
         }
 
-        // Mock payment mode for testing
         const isMockMode = localStorage.getItem('piMarketMateMockPayment') === 'true';
         if (isMockMode) {
           console.log('Checkpoint: Running in mock payment mode');
-          alert(`Mock Payment Successful! Amount: ${amount} Pi, Memo: ${memo}`);
-          saveCalculation(amount, amount, true);
+          alert(`Mock Payment Successful! Amount: ${numericAmount.toFixed(4)} Pi, Memo: ${memo}`);
+          // Assuming amountInPi is the Pi amount from calculation
+          saveCalculation(numericAmount, numericAmount, true); // Adjust if input needs to be different for donations
           return;
         }
 
         console.log('Checkpoint: Checking Pi SDK availability...');
         if (!window.Pi || typeof window.Pi.init !== 'function') {
           console.log('Checkpoint: window.Pi is undefined or malformed, attempting to reload SDK...');
-          sdkLoadAttempts = 0;
+          sdkLoadAttempts = 0; // Reset attempts for this critical path
           try {
-            await loadSdk(sdkUrls[0]);
+            // Try loading the primary SDK URL again
+            await loadSdk(sdkUrls[0]); 
             if (!window.Pi || typeof window.Pi.init !== 'function') {
-              throw new Error('Pi SDK is not available or malformed after retry. Please ensure you\'re in the Pi Browser.');
+              throw new Error('Pi SDK is not available or malformed after explicit reload attempt. Please ensure you\'re in the Pi Browser.');
             }
           } catch (err) {
-            console.error('Checkpoint: SDK reload failed:', {
-              message: err.message || 'Unknown error',
-              stack: err.stack
-            });
+            console.error('Checkpoint: SDK reload failed:', { message: err.message || 'Unknown error', stack: err.stack });
             throw new Error('Pi SDK is not available: ' + (err.message || 'Unknown error'));
           }
         }
-
+        
         console.log('Checkpoint: Pi SDK object properties:', Object.keys(window.Pi));
         console.log('Checkpoint: Ensuring Pi SDK is ready...');
-        let isReady;
+        let sdkIsReady;
         try {
-          isReady = await ensurePiSDKReady();
-          console.log('Checkpoint: ensurePiSDKReady result:', isReady);
-          if (!isReady) {
-            throw new Error('Pi SDK failed to become ready');
+          sdkIsReady = await ensurePiSDKReady();
+          console.log('Checkpoint: ensurePiSDKReady result:', sdkIsReady);
+          if (!sdkIsReady) {
+            throw new Error('Pi SDK failed to become ready. Cannot proceed with payment.');
           }
         } catch (err) {
-          console.error('Checkpoint: SDK ready error:', {
-            message: err.message || 'Unknown error',
-            stack: err.stack
-          });
+          console.error('Checkpoint: SDK ready error during payment:', { message: err.message || 'Unknown error', stack: err.stack });
           throw new Error('Pi SDK initialization failed: ' + (err.message || 'Unknown error'));
         }
 
         console.log('Checkpoint: Pi SDK ready, proceeding with authentication...');
-        console.log('Checkpoint: Authenticating user...');
         let authResult;
-        const authAttempts = 2;
-        const scopeOptions = [['payments'], []];
-        for (let attempt = 1; attempt <= authAttempts; attempt++) {
-          for (let scopes of scopeOptions) {
+        const authScopeOptions = [['payments'], ['username', 'payments'], []]; // Try payments, then username+payments, then empty
+        let authenticated = false;
+
+        for (const scopes of authScopeOptions) {
             try {
-              console.log(`Checkpoint: Authentication attempt ${attempt}/${authAttempts} with scopes:`, scopes);
-              authResult = await window.Pi.authenticate(scopes, (payment) => {
-                console.log('Checkpoint: Incomplete payment found:', payment);
-              });
-              console.log('Checkpoint: User authenticated:', authResult);
-              break;
+                console.log(`Checkpoint: Authentication attempt with scopes: [${scopes.join(', ')}]`);
+                authResult = await window.Pi.authenticate(scopes, (payment) => {
+                    console.log('Checkpoint: Incomplete payment found during auth:', payment);
+                    // Potentially handle incomplete payment here
+                });
+                console.log('Checkpoint: User authenticated:', authResult);
+                authenticated = true;
+                break; 
             } catch (authErr) {
-              console.error(`Checkpoint: Authentication attempt ${attempt} failed with scopes ${JSON.stringify(scopes)}:`, {
-                message: authErr.message || 'Unknown authentication error',
-                stack: authErr.stack
-              });
-              if (attempt === authAttempts && scopes.length === 0) {
-                throw new Error('Authentication failed: ' + (authErr.message || 'Unknown error'));
-              }
+                console.error(`Checkpoint: Authentication attempt failed with scopes [${scopes.join(', ')}]:`, {
+                    message: authErr.message || 'Unknown authentication error',
+                    code: authErr.code, // Pi SDK errors often have a code
+                    stack: authErr.stack
+                });
             }
-          }
-          if (authResult) break;
-        }
-        if (!authResult) {
-          throw new Error('Authentication failed after all attempts');
         }
 
-        console.log(`Checkpoint: Initiating payment for ${amount} Pi...`);
+        if (!authenticated) {
+            throw new Error('Authentication failed after all attempts. Cannot proceed with payment.');
+        }
+        
+        console.log(`Checkpoint: Initiating payment for ${numericAmount.toFixed(4)} Pi...`);
         const paymentData = {
-          amount: amount,
+          amount: numericAmount, // Use the validated numeric amount
           memo: memo,
           metadata: metadata
         };
+
         const paymentCallbacks = {
           onReadyForServerApproval: async (paymentId) => {
-            console.log('Checkpoint: Payment ID ready for approval:', paymentId);
+            console.log('Checkpoint: Payment ID ready for server approval:', paymentId);
             try {
-              // Mock server approval
-              console.log('Checkpoint: Mocking server approval for payment:', paymentId);
-              const response = { ok: true, status: 200, statusText: 'OK', text: () => Promise.resolve('Mock approval') };
-              console.log('Checkpoint: Approval response (mocked):', response);
-              console.log('Checkpoint: Payment approved by server (mocked)');
+              // In a real app, you'd call your backend here to approve the payment.
+              // For this client-side app, we'll simulate approval.
+              console.log('Checkpoint: Simulating server approval for payment:', paymentId);
+              // Fake backend call: await fetch(`/api/approvePayment?paymentId=${paymentId}&userId=${authResult.user.uid}`);
+              // If successful, the Pi Network will proceed.
+              // If your server logic denies or fails, you'd handle that.
+              // For now, we assume implicit client-side "approval" for demo purposes.
+              console.log('Checkpoint: Payment approved by (simulated) server for paymentId:', paymentId);
             } catch (error) {
-              console.error('Checkpoint: Server approval error:', {
-                message: error.message || 'Unknown error',
-                stack: error.stack
-              });
-              throw new Error('Payment approval failed: ' + (error.message || 'Unknown error'));
+              console.error('Checkpoint: Server approval simulation error:', { message: error.message || 'Unknown error', stack: error.stack });
+              // If server approval actually fails, this would be critical.
+              // For now, this path might not be hit in pure client-side mock.
+              throw new Error('Payment approval (simulated) failed: ' + (error.message || 'Unknown error'));
             }
           },
           onReadyForServerCompletion: async (paymentId, txid) => {
-            console.log('Checkpoint: Payment ready for completion:', paymentId, 'txid:', txid);
+            console.log('Checkpoint: Payment ready for server completion:', paymentId, 'txid:', txid);
             try {
-              // Mock server completion
-              console.log('Checkpoint: Mocking server completion for payment:', paymentId, 'txid:', txid);
-              const response = { ok: true, status: 200, statusText: 'OK', text: () => Promise.resolve('Mock completion') };
-              console.log('Checkpoint: Completion response (mocked):', response);
-              console.log('Checkpoint: Payment completed successfully (mocked)');
-              saveCalculation(amount, amount, true);
-              alert('Payment successful! Transaction ID: ' + txid);
+              // In a real app, call your backend to complete the payment record.
+              // Fake backend call: await fetch(`/api/completePayment?paymentId=${paymentId}&txid=${txid}`);
+              console.log('Checkpoint: Simulating server completion for payment:', paymentId, 'txid:', txid);
+              console.log('Checkpoint: Payment completed successfully (simulated server-side) with txid:', txid);
+              
+              // Find the relevant calculation to mark as paid or save a new one for donations
+              const recentCalc = recentCalculations.find(calc => calc.mode === 'usd-to-pi' && parseFloat(calc.result) === numericAmount && !calc.paid);
+              if (metadata.type === 'donation') {
+                 saveCalculation(numericAmount, numericAmount, true); // For donations, input and result are the Pi amount
+              } else if (recentCalc) {
+                  recentCalc.paid = true;
+                  localStorage.setItem('piMarketMateCalculations', JSON.stringify(recentCalculations));
+                  updateRecentCalculations();
+              } else {
+                  // Fallback if no matching calculation, e.g. direct payment
+                  saveCalculation(numericAmount, numericAmount, true);
+              }
+              alert(`Payment of ${numericAmount.toFixed(4)} Pi successful! Transaction ID: ${txid}`);
             } catch (error) {
-              console.error('Checkpoint: Server completion error:', {
-                message: error.message || 'Unknown error',
-                stack: error.stack
-              });
-              throw new Error('Payment completion failed: ' + (error.message || 'Unknown error'));
+              console.error('Checkpoint: Server completion simulation error:', { message: error.message || 'Unknown error', stack: error.stack });
+              throw new Error('Payment completion (simulated) failed: ' + (error.message || 'Unknown error'));
             }
           },
-          onCancel: () => {
-            console.log('Checkpoint: Payment cancelled by user');
+          onCancel: (paymentId) => { // paymentId might be null if cancelled early
+            console.log('Checkpoint: Payment cancelled by user. PaymentId (if available):', paymentId);
             showError('Payment cancelled by user.');
           },
-          onError: (error) => {
-            console.error('Checkpoint: Payment error:', {
+          onError: (error, payment) => { // payment object might be available
+            console.error('Checkpoint: Payment error from Pi SDK:', {
               message: error.message || 'Unknown payment error',
+              code: error.code, // Important for diagnosing Pi specific errors
+              details: error.details,
+              paymentObject: payment,
               stack: error.stack
             });
-            showError('Payment failed: ' + (error.message || 'Unknown error'));
+            showError(`Payment failed: ${error.message || 'Unknown error'} (Code: ${error.code || 'N/A'})`);
           }
         };
 
-        console.log('Checkpoint: Creating payment with data:', paymentData);
-        try {
-          const paymentPromise = window.Pi.createPayment(paymentData, paymentCallbacks);
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Payment creation timed out after 60s')), 60000);
-          });
-          const payment = await Promise.race([paymentPromise, timeoutPromise]);
-          console.log('Checkpoint: Payment created:', payment);
-        } catch (paymentErr) {
-          console.error('Checkpoint: Payment creation error:', {
-            message: paymentErr.message || 'Unknown error',
-            stack: paymentErr.stack
-          });
-          throw new Error('Payment creation failed: ' + (paymentErr.message || 'Unknown error'));
-        }
+        console.log('Checkpoint: Calling Pi.createPayment with data:', paymentData);
+        // Pi.createPayment can take time, especially with user interaction.
+        // No explicit timeout here as SDK handles user interaction time.
+        await window.Pi.createPayment(paymentData, paymentCallbacks);
+        console.log('Checkpoint: Pi.createPayment call initiated. Waiting for callbacks...');
+
       } catch (error) {
-        console.error('Checkpoint: Error in initiatePayment:', {
+        console.error('Checkpoint: Error in initiatePayment outer try-catch:', {
           message: error.message || 'Unknown error',
           stack: error.stack
         });
@@ -828,7 +815,6 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
       const usdToPiBtn = document.getElementById('usd-to-pi-btn');
       if (usdToPiBtn) {
         usdToPiBtn.addEventListener('click', () => setMode('usd-to-pi'));
-        usdToPiBtn.addEventListener('touchstart', () => setMode('usd-to-pi'));
       } else {
         console.warn('Checkpoint: Element "usd-to-pi-btn" not found');
       }
@@ -836,7 +822,6 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
       const piToUsdBtn = document.getElementById('pi-to-usd-btn');
       if (piToUsdBtn) {
         piToUsdBtn.addEventListener('click', () => setMode('pi-to-usd'));
-        piToUsdBtn.addEventListener('touchstart', () => setMode('pi-to-usd'));
       } else {
         console.warn('Checkpoint: Element "pi-to-usd-btn" not found');
       }
@@ -845,21 +830,25 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
       const currencyCheck = document.getElementById('currency-check');
       if (currencySelect && currencyCheck) {
         currencySelect.value = currentCurrency;
-        currencyCheck.classList.remove('hidden');
+        currencyCheck.classList.remove('hidden'); // Assume valid initially
         currencySelect.addEventListener('change', (e) => {
           console.log('Checkpoint: Currency changed:', e.target.value);
           const selectedCurrency = e.target.value.toUpperCase();
-          if (lastPiPrices.hasOwnProperty(selectedCurrency)) {
+          if (lastPiPrices.hasOwnProperty(selectedCurrency)) { // Check if currency is in our known list
             currentCurrency = selectedCurrency;
             localStorage.setItem('piMarketMateCurrency', selectedCurrency);
-            document.getElementById('input-label-text').textContent = 
-              currentMode === 'usd-to-pi' ? 
-              `2. ENTER AMOUNT (${currentCurrency}):` : 
-              '2. ENTER AMOUNT (PI):';
+            const inputLabel = document.getElementById('input-label-text');
+            if (inputLabel) {
+                inputLabel.textContent = 
+                currentMode === 'usd-to-pi' ? 
+                `2. ENTER AMOUNT (${currentCurrency}):` : 
+                '2. ENTER AMOUNT (PI):';
+            }
             currencyCheck.classList.remove('hidden');
-            updatePiPrice();
+            updatePiPrice(); // Fetch new price for the selected currency
           } else {
             currencyCheck.classList.add('hidden');
+            console.warn("Selected currency not in predefined list:", selectedCurrency);
           }
         });
       } else {
@@ -867,19 +856,19 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
       }
 
       const amountInput = document.getElementById('amount');
-      const amountCheck = document.getElementById('amount-check');
-      if (amountInput && amountCheck) {
+      const amountCheckEl = document.getElementById('amount-check'); // Renamed to avoid conflict
+      if (amountInput && amountCheckEl) {
         amountInput.addEventListener('input', (e) => {
-          const amount = parseFloat(e.target.value);
-          console.log('Checkpoint: Amount input:', amount);
-          if (!isNaN(amount) && amount > 0) {
-            amountCheck.classList.remove('hidden');
+          const amountVal = parseFloat(e.target.value); // Renamed to avoid conflict
+          console.log('Checkpoint: Amount input:', amountVal);
+          if (!isNaN(amountVal) && amountVal > 0) {
+            amountCheckEl.classList.remove('hidden');
           } else {
-            amountCheck.classList.add('hidden');
+            amountCheckEl.classList.add('hidden');
           }
         });
       } else {
-        console.warn('Checkpoint: Amount elements not found:', { amountInput, amountCheck });
+        console.warn('Checkpoint: Amount elements not found:', { amountInput, amountCheckEl });
       }
 
       const calculateBtn = document.getElementById('calculate-btn');
@@ -890,14 +879,19 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
           const amount = parseFloat(document.getElementById('amount').value);
           try {
             let piPrice = getEffectivePiPrice();
-            if (!piPrice) {
-              await fetchPiPrice(currentCurrency);
-              piPrice = getEffectivePiPrice();
+            if (piPrice === null || isNaN(piPrice) || piPrice <=0) { // Explicitly check if price is not valid
+              console.log('Checkpoint: Pi price not available or invalid, attempting to fetch...');
+              await updatePiPrice(); // This will try to fetch and update manual price input
+              piPrice = getEffectivePiPrice(); // Get it again after potential update
+              if (piPrice === null || isNaN(piPrice) || piPrice <=0) {
+                  showError('Pi price is still unavailable. Please enter a manual price or try again later.');
+                  return;
+              }
             }
             const result = calculateAmount(amount, piPrice);
-            if (result) {
+            if (result !== null) { // Check if calculation was successful
               const prefix = currentMode === 'usd-to-pi' ? 'You need: ' : 'You get: ';
-              const value = currentMode === 'usd-to-pi' ? `${result} Pi` : `${result} ${currentCurrency}`;
+              const value = currentMode === 'usd-to-pi' ? `${parseFloat(result).toFixed(4)} Pi` : `${result} ${currentCurrency}`;
               const resultTextPrefix = document.getElementById('result-text-prefix');
               const resultValue = document.getElementById('result-value');
               const resultDiv = document.getElementById('result');
@@ -905,8 +899,11 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
                 resultTextPrefix.textContent = prefix;
                 resultValue.textContent = value;
                 resultDiv.classList.remove('hidden');
+                resultDiv.scrollIntoView({ behavior: 'smooth' });
                 if (currentMode === 'usd-to-pi') {
                   lastCalculatedPiAmount = parseFloat(result);
+                } else {
+                  lastCalculatedPiAmount = null; // Not a Pi amount if converting Pi to currency
                 }
                 console.log('Checkpoint: Calculation result:', { prefix, value, lastCalculatedPiAmount });
                 saveCalculation(amount, result);
@@ -915,10 +912,7 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
               }
             }
           } catch (error) {
-            console.error('Checkpoint: Calculation error:', {
-              message: error.message || 'Unknown error',
-              stack: error.stack
-            });
+            console.error('Checkpoint: Calculation error:', { message: error.message || 'Unknown error', stack: error.stack });
             showError('Failed to calculate amount: ' + (error.message || 'Unknown error'));
           }
         });
@@ -931,22 +925,19 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
         payWithPiBtn.addEventListener('click', async () => {
           console.log('Checkpoint: Pay with Pi button clicked');
           clearError();
-          if (!lastCalculatedPiAmount || isNaN(lastCalculatedPiAmount) || lastCalculatedPiAmount <= 0) {
-            showError('Please calculate a valid Pi amount first.');
+          if (currentMode !== 'usd-to-pi' || !lastCalculatedPiAmount || isNaN(lastCalculatedPiAmount) || lastCalculatedPiAmount <= 0) {
+            showError('Please calculate a valid Currency to Pi amount first before paying.');
             return;
           }
           try {
             await initiatePayment(
               lastCalculatedPiAmount,
-              `Payment for ${lastCalculatedPiAmount} Pi`,
-              { type: 'purchase', currency: currentCurrency }
+              `Payment via Pi Market Mate for ${lastCalculatedPiAmount.toFixed(4)} Pi`,
+              { type: 'purchase', item: 'Calculated Amount', originalCurrency: currentCurrency, originalAmount: document.getElementById('amount').value }
             );
           } catch (error) {
-            console.error('Checkpoint: Payment initiation error:', {
-              message: error.message || 'Unknown error',
-              stack: error.stack
-            });
-            showError('Payment initiation failed: ' + (error.message || 'Unknown error'));
+            console.error('Checkpoint: Payment initiation error from button:', { message: error.message || 'Unknown error', stack: error.stack });
+            // initiatePayment should handle its own errors and showError calls
           }
         });
       } else {
@@ -993,20 +984,27 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
         confirmDonationBtn.addEventListener('click', async () => {
           console.log('Checkpoint: Confirm donation clicked');
           const donationAmount = parseFloat(document.getElementById('donation-amount-select').value);
+          if (isNaN(donationAmount) || donationAmount <= 0) {
+              showError("Invalid donation amount selected.");
+              return;
+          }
           try {
             await initiatePayment(
               donationAmount,
-              `Donation of ${donationAmount} Pi`,
-              { type: 'donation' }
+              `Donation of ${donationAmount} Pi to Pi Market Mate`,
+              { type: 'donation', app: 'Pi Market Mate' }
             );
-            overlay.classList.add('hidden');
-            donationPopup.classList.add('hidden');
+            // initiatePayment handles success/error display. Hide popup on success/cancel.
+            // Consider hiding popup only after successful payment callback.
+            // For now, hide it optimistically or rely on user to close if payment fails/cancels.
           } catch (error) {
-            console.error('Checkpoint: Donation payment error:', {
-              message: error.message || 'Unknown error',
-              stack: error.stack
-            });
-            showError('Donation failed: ' + (error.message || 'Unknown error'));
+            console.error('Checkpoint: Donation payment error from button:', { message: error.message || 'Unknown error', stack: error.stack });
+          } finally {
+            // Hide popup regardless of payment outcome (user might cancel)
+            // It's better if initiatePayment signals completion to control this.
+            // For now, simple hide:
+             overlay.classList.add('hidden');
+             donationPopup.classList.add('hidden');
           }
         });
       } else {
@@ -1034,37 +1032,34 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
 
       async function showTextFile(url, filename) {
         console.log('Checkpoint: Fetching text file:', url);
+        if (!(textViewer && textContent && textFallback && textDownloadLink && closeTextBtn)) {
+            console.warn('Checkpoint: Text viewer elements not fully found. Aborting showTextFile.');
+            alert(`Cannot display ${filename} as some UI elements are missing.`);
+            return;
+        }
+        // Ensure viewer is clean before loading new content
+        textContent.textContent = '';
+        textFallback.textContent = '';
+        textFallback.classList.add('hidden');
+        textViewer.classList.remove('hidden'); // Show viewer, then content or error
+
         try {
-          const response = await fetch(url);
+          const response = await fetch(url, { cache: 'no-store' }); // Avoid caching for policy files
           if (!response.ok) {
-            throw new Error(`Failed to fetch ${filename}: ${response.status}`);
+            throw new Error(`Failed to fetch ${filename}: ${response.status} ${response.statusText}`);
           }
           const text = await response.text();
-          if (textViewer && textContent && textFallback && textDownloadLink) {
-            textContent.textContent = text;
-            textFallback.classList.add('hidden');
-            textDownloadLink.href = url;
-            textDownloadLink.download = filename;
-            textViewer.classList.remove('hidden');
-            textViewer.scrollIntoView({ behavior: 'smooth' });
-          } else {
-            console.warn('Checkpoint: Text viewer elements not found:', { textViewer, textContent, textFallback, textDownloadLink });
-            alert(`Content of ${filename}:\n${text}`);
-          }
+          textContent.textContent = text;
+          textDownloadLink.href = url; // Could also create a blob URL for direct download
+          textDownloadLink.download = filename;
+          textViewer.scrollIntoView({ behavior: 'smooth' });
         } catch (error) {
-          console.error('Checkpoint: Text file fetch error:', {
-            message: error.message || 'Unknown error',
-            stack: error.stack
-          });
-          if (textViewer && textFallback) {
-            textFallback.textContent = `Failed to load ${filename}.`;
-            textFallback.classList.remove('hidden');
-            textViewer.classList.remove('hidden');
-            textViewer.scrollIntoView({ behavior: 'smooth' });
-          } else {
-            console.warn('Checkpoint: Text viewer elements not found for error:', { textViewer, textFallback });
-            alert(`Error: Failed to load ${filename}.`);
-          }
+          console.error('Checkpoint: Text file fetch error:', { message: error.message || 'Unknown error', stack: error.stack });
+          textFallback.textContent = `Failed to load ${filename}: ${error.message}. You can try downloading it.`;
+          textFallback.classList.remove('hidden');
+          textDownloadLink.href = url; 
+          textDownloadLink.download = filename;
+          textViewer.scrollIntoView({ behavior: 'smooth' });
         }
       }
 
@@ -1099,8 +1094,11 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
           console.log('Checkpoint: Close text viewer clicked');
           if (textViewer) {
             textViewer.classList.add('hidden');
-            textContent.textContent = '';
-            textFallback.classList.add('hidden');
+            if(textContent) textContent.textContent = '';
+            if(textFallback) {
+                textFallback.textContent = '';
+                textFallback.classList.add('hidden');
+            }
           } else {
             console.warn('Checkpoint: Text viewer not found for close');
           }
@@ -1113,17 +1111,28 @@ Ensure SDK Ready Result: ${debugInfo.ensureSdkReadyResult}
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
       console.log('Checkpoint: DOM Content Loaded');
+      setMode('usd-to-pi'); // Initialize mode correctly
       setupEventListeners();
       updateRecentCalculations();
-      updatePiPrice();
+      updatePiPrice(); // Initial price fetch
+      
       if (isPiBrowser()) {
         console.log('Checkpoint: Pi Browser detected, preloading Pi SDK...');
+        // Preload the primary SDK. ensurePiSDKReady will handle full init later if needed.
         loadSdk(sdkUrls[0]).catch(error => {
           console.error('Checkpoint: Preload SDK error:', {
             message: error.message || 'Unknown error',
             stack: error.stack
           });
+          // Optionally show a non-blocking warning to the user if preload fails critically
         });
+      } else {
+          console.warn('Checkpoint: Not in Pi Browser. Pi Network features (payment, advanced SDK use) will be unavailable.');
+          // Optionally disable Pi-specific buttons or show a message
+          const payWithPiBtn = document.getElementById('pay-with-pi-btn');
+          if(payWithPiBtn) payWithPiBtn.disabled = true;
+          const donationLink = document.getElementById('donation-link');
+          if(donationLink) donationLink.style.pointerEvents = 'none'; donationLink.style.opacity = '0.5';
       }
     });
   </script>
