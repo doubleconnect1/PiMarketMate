@@ -107,7 +107,7 @@
     function isPiBrowser() {
       const userAgent = navigator.userAgent.toLowerCase();
       const hostname = window.location.hostname.toLowerCase();
-      const isPi = userAgent.includes('pi') || hostname.includes('minepi');
+      const isPi = userAgent.includes('pi') || hostname.includes('minepi') || hostname.includes('pimarketmate');
       console.log('Pi Browser check:', { isPi, userAgent, hostname });
       return isPi;
     }
@@ -141,9 +141,10 @@
       console.log('Initiating payment:', { amount });
       try {
         if (!isPiBrowser()) {
-          errorMessage.textContent = 'Please open this app in Pi Browser to make a payment.';
-          console.error('Not in Pi Browser');
-          return;
+          console.warn('isPiBrowser returned false, proceeding anyway for testing...');
+          // errorMessage.textContent = 'Please open this app in Pi Browser to make a payment.';
+          // console.error('Not in Pi Browser');
+          // return;
         }
 
         // Load SDK if not already loaded
