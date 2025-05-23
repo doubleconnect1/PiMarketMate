@@ -75,6 +75,7 @@
   <button onclick="initiatePayment()">Pay with Pi</button>
   <button onclick="testAuthentication()">Test Authentication</button>
   <button onclick="testMinimalAuth()">Test Minimal Auth</button>
+  <button onclick="testUsernameAuth()">Test Username Auth</button>
   <button onclick="testNetwork()">Test Network</button>
   <button onclick="testAppId()">Test App ID</button>
   <br>
@@ -252,6 +253,70 @@
       } catch (err) {
         logMessage(`Minimal authentication failed: ${err.message}`, true);
         errorMessage.textContent = `Minimal authentication failed: ${err.message}`;
+      }
+      loadingMessage.textContent = '';
+    }
+
+    // Test username authentication
+    async function testUsernameAuth() {
+      const errorMessage = document.getElementById('error-message');
+      const loadingMessage = document.getElementById('loading-message');
+      errorMessage.textContent = '';
+      loadingMessage.textContent = 'Testing username authentication...';
+      logMessage('Starting testUsernameAuth');
+
+      try {
+        if (!window.Pi) {
+          logMessage('window.Pi is undefined, attempting to load SDK...');
+          sdkLoadAttempts = 0;
+          let sdkLoaded = false;
+          for (const url of sdkUrls) {
+            sdkLoadAttempts++;
+            logMessage(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
+            sdkLoaded = await loadSdk(url);
+            if (sdkLoaded) break;
+          }
+          if (!sdkLoaded || !window.Pi) {
+            throw new Error(`Pi SDK unavailable after ${sdkLoadAttempts} attempts`);
+          }
+        }
+
+        const isReady = await ensurePiSDKReady();
+        if (!isReady) {
+          throw new Error('Pi SDK failed to initialize');
+        }
+
+        const sandbox = new URLSearchParams(window.location.search).get('useSandbox') !== 'false';
+        logMessage(`Initializing Pi SDK with appId: marketmate, version: 2.0, sandbox: ${sandbox}`);
+        try {
+          await window.Pi.init({
+            version: '2.0',
+            sandbox: sandbox,
+            appId: 'marketmate'
+          });
+          logMessage('Pi.init succeeded');
+        } catch (err) {
+          throw new Error(`Pi SDK initialization failed: ${err.message}`);
+        }
+
+        logMessage('Authenticating user with username scope...');
+        const authPromise = window.Pi.authenticate(
+          ['username'],
+          () => {
+            logMessage('Username authentication cancelled by user');
+            errorMessage.textContent = 'Username authentication cancelled by user.';
+            loadingMessage.textContent = '';
+          }
+        );
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Username authentication timed out after 10 seconds')), 10000);
+        });
+        const authResult = await Promise.race([authPromise, timeoutPromise]);
+        logMessage(`Username authentication succeeded: ${JSON.stringify(authResult)}`);
+        errorMessage.textContent = 'Username authentication succeeded!';
+      } catch (err) {
+        logMessage(`Username authentication failed: ${err.message}`, true);
+        errorMessage.textContent = `Username authentication failed: ${err.message}`;
       }
       loadingMessage.textContent = '';
     }
