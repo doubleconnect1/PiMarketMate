@@ -73,7 +73,7 @@
   <script>
     const sdkUrls = [
       'https://sdk.minepi.com/pi-sdk.js',
-      'https://cdn.jsdelivr.net/npm/@pi-network/pi-sdk@1.0.0/dist/pi-sdk.min.js'
+      'https://cdn.jsdelivr.net/npm/@pi-network/pi-sdk@2.0.0/dist/pi-sdk.min.js'
     ];
     let sdkLoadAttempts = 0;
 
@@ -115,6 +115,7 @@
 
     // Ensure Pi SDK is ready
     async function ensurePiSDKReady() {
+      console.log('Checking if Pi SDK is ready...');
       const timeoutMs = 30000;
       const startTime = Date.now();
       while (!window.Pi && (Date.now() - startTime) < timeoutMs) {
@@ -124,6 +125,7 @@
         console.error('Pi SDK initialization timed out after', timeoutMs, 'ms');
         return false;
       }
+      console.log('Pi SDK is ready:', window.Pi);
       return true;
     }
 
@@ -134,27 +136,26 @@
       const errorMessage = document.getElementById('error-message');
 
       errorMessage.textContent = '';
-      if (!amount || amount <= 0) {
-        errorMessage.textContent = 'Please enter a valid Pi amount.';
-        return;
-      }
-
-      console.log('Initiating payment:', { amount });
+      console.log('Starting initiatePayment with amount:', amount);
       try {
-        if (!isPiBrowser()) {
-          console.warn('isPiBrowser returned false, proceeding anyway for testing...');
-          // errorMessage.textContent = 'Please open this app in Pi Browser to make a payment.';
-          // console.error('Not in Pi Browser');
-          // return;
+        if (!amount || amount <= 0) {
+          errorMessage.textContent = 'Please enter a valid Pi amount.';
+          console.error('Invalid amount:', amount);
+          return;
         }
 
-        // Load SDK if not already loaded
+        if (!isPiBrowser()) {
+          console.warn('isPiBrowser returned false, proceeding anyway for testing...');
+        }
+
+        console.log('Checking window.Pi before loading SDK...');
         if (!window.Pi) {
           console.warn('window.Pi is undefined, attempting to load SDK...');
           sdkLoadAttempts = 0;
           let sdkLoaded = false;
           for (const url of sdkUrls) {
             sdkLoadAttempts++;
+            console.log(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
             sdkLoaded = await loadSdk(url);
             if (sdkLoaded) break;
           }
@@ -166,7 +167,6 @@
         }
 
         console.log('Pi SDK object:', window.Pi);
-        console.log('Ensuring Pi SDK is ready...');
         const isReady = await ensurePiSDKReady();
         if (!isReady) {
           errorMessage.textContent = 'Pi SDK failed to initialize. Please try again.';
@@ -176,80 +176,96 @@
 
         // Initialize Pi SDK
         console.log('Initializing Pi SDK with appId: marketmate, version: 2.0');
-        await window.Pi.init({
-          version: '2.0',
-          sandbox: true,
-          appId: 'marketmate'
-        }).catch(err => {
-          console.error('Pi.init failed:', err.message);
-          throw new Error('Pi SDK initialization failed: ' + err.message);
-        });
+        try {
+          await window.Pi.init({
+            version: '2.0',
+            sandbox: true,
+            appId: 'marketmate'
+          });
+          console.log('Pi.init succeeded');
+        } catch (err) {
+          console.error('Pi.init failed:', err.message, err.stack);
+          errorMessage.textContent = 'Pi SDK initialization failed: ' + err.message;
+          return;
+        }
 
         // Authenticate user
         console.log('Authenticating user...');
-        const authResult = await window.Pi.authenticate(
-          ['payments'],
-          () => console.log('Payment cancelled by user')
-        ).catch(err => {
-          console.error('Authentication failed:', err.message);
-          throw new Error('Authentication failed: ' + err.message);
-        });
-        console.log('User authenticated:', authResult);
+        try {
+          const authResult = await window.Pi.authenticate(
+            ['payments'],
+            () => {
+              console.log('Payment cancelled by user');
+              errorMessage.textContent = 'Payment cancelled by user.';
+            }
+          );
+          console.log('User authenticated:', authResult);
+        } catch (err) {
+          console.error('Authentication failed:', err.message, err.stack);
+          errorMessage.textContent = 'Authentication failed: ' + err.message;
+          return;
+        }
 
         // Create payment
         console.log(`Creating payment for ${amount} Pi...`);
-        const payment = await window.Pi.createPayment({
-          amount: amount,
-          memo: 'Payment for Pi Market Mate',
-          metadata: { orderId: `order_${Date.now()}` }
-        }, {
-          onReadyForServerApproval: async (paymentId) => {
-            console.log('Payment ready for approval:', paymentId);
-            try {
-              const response = await fetch('/api/payments/approve', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paymentId })
-              });
-              const result = await response.json();
-              if (!result.success) {
-                throw new Error('Approval failed: ' + (result.error || 'Unknown error'));
+        try {
+          const payment = await window.Pi.createPayment({
+            amount: amount,
+            memo: 'Payment for Pi Market Mate',
+            metadata: { orderId: `order_${Date.now()}` }
+          }, {
+            onReadyForServerApproval: async (paymentId) => {
+              console.log('Payment ready for approval:', paymentId);
+              try {
+                const response = await fetch('/api/payments/approve', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ paymentId })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                  throw new Error('Approval failed: ' + (result.error || 'Unknown error'));
+                }
+                console.log('Payment approved:', result);
+              } catch (err) {
+                console.error('Approval error:', err.message);
+                throw err;
               }
-              console.log('Payment approved:', result);
-            } catch (err) {
-              console.error('Approval error:', err.message);
-              throw err;
-            }
-          },
-          onReadyForServerCompletion: async (paymentId, txid) => {
-            console.log('Payment ready for completion:', paymentId, txid);
-            try {
-              const response = await fetch('/api/payments/complete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paymentId, txid })
-              });
-              const result = await response.json();
-              if (!result.success) {
-                throw new Error('Completion failed: ' + (result.error || 'Unknown error'));
+            },
+            onReadyForServerCompletion: async (paymentId, txid) => {
+              console.log('Payment ready for completion:', paymentId, txid);
+              try {
+                const response = await fetch('/api/payments/complete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ paymentId, txid })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                  throw new Error('Completion failed: ' + (result.error || 'Unknown error'));
+                }
+                console.log('Payment completed:', result);
+              } catch (err) {
+                console.error('Completion error:', err.message);
+                throw err;
               }
-              console.log('Payment completed:', result);
-            } catch (err) {
-              console.error('Completion error:', err.message);
-              throw err;
+            },
+            onCancel: () => {
+              console.log('Payment cancelled');
+              errorMessage.textContent = 'Payment was cancelled.';
+            },
+            onError: (err) => {
+              console.error('Payment error:', err.message);
+              errorMessage.textContent = 'Payment failed: ' + err.message;
             }
-          },
-          onCancel: () => {
-            console.log('Payment cancelled');
-            errorMessage.textContent = 'Payment was cancelled.';
-          },
-          onError: (err) => {
-            console.error('Payment error:', err.message);
-            errorMessage.textContent = 'Payment failed: ' + err.message;
-          }
-        });
-        console.log('Payment created:', payment);
-        errorMessage.textContent = 'Payment initiated! Check Pi wallet.';
+          });
+          console.log('Payment created:', payment);
+          errorMessage.textContent = 'Payment initiated! Check Pi wallet.';
+        } catch (err) {
+          console.error('Payment creation failed:', err.message, err.stack);
+          errorMessage.textContent = 'Payment failed: ' + err.message;
+          return;
+        }
       } catch (error) {
         console.error('Error in initiatePayment:', error.message, error.stack);
         errorMessage.textContent = 'An error occurred: ' + error.message;
