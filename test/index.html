@@ -56,9 +56,14 @@
       margin: 10px;
       font-size: 16px;
     }
+    #error-message, #loading-message {
+      margin-top: 10px;
+    }
     #error-message {
       color: red;
-      margin-top: 10px;
+    }
+    #loading-message {
+      color: blue;
     }
   </style>
 </head>
@@ -68,6 +73,10 @@
   <input type="number" id="amount" placeholder="Enter Pi amount" step="0.01" min="0">
   <br>
   <button onclick="initiatePayment()">Pay with Pi</button>
+  <button onclick="testAuthentication()">Test Authentication</button>
+  <br>
+  <label><input type="checkbox" id="debugMode" checked> Enable Debug Mode</label>
+  <div id="loading-message"></div>
   <div id="error-message"></div>
 
   <script>
@@ -77,21 +86,28 @@
     ];
     let sdkLoadAttempts = 0;
 
+    // Utility to log messages
+    function logMessage(message, isError = false) {
+      if (document.getElementById('debugMode').checked) {
+        console[isError ? 'error' : 'log'](message);
+      }
+    }
+
     // Load Pi SDK
     async function loadSdk(url) {
-      console.log(`Attempting to load SDK from: ${url}`);
+      logMessage(`Attempting to load SDK from: ${url}`);
       try {
         const script = document.createElement('script');
         script.src = url;
         script.async = true;
         const loadPromise = new Promise((resolve, reject) => {
           script.onload = () => {
-            console.log(`SDK loaded successfully from: ${url}`);
-            console.log('Pi SDK version:', window.Pi ? (window.Pi.version || 'unknown') : 'not loaded');
+            logMessage(`SDK loaded successfully from: ${url}`);
+            logMessage(`Pi SDK version: ${window.Pi ? (window.Pi.version || 'unknown') : 'not loaded'}`);
             resolve(true);
           };
           script.onerror = () => {
-            console.error(`Failed to load SDK from: ${url}`);
+            logMessage(`Failed to load SDK from: ${url}`, true);
             reject(new Error(`Failed to load SDK from ${url}`));
           };
         });
@@ -99,7 +115,7 @@
         await loadPromise;
         return true;
       } catch (error) {
-        console.error('SDK load error:', error.message);
+        logMessage(`SDK load error: ${error.message}`, true);
         return false;
       }
     }
@@ -109,24 +125,87 @@
       const userAgent = navigator.userAgent.toLowerCase();
       const hostname = window.location.hostname.toLowerCase();
       const isPi = userAgent.includes('pi') || hostname.includes('minepi') || hostname.includes('pimarketmate');
-      console.log('Pi Browser check:', { isPi, userAgent, hostname });
+      logMessage(`Pi Browser check: ${JSON.stringify({ isPi, userAgent, hostname })}`);
       return isPi;
     }
 
     // Ensure Pi SDK is ready
     async function ensurePiSDKReady() {
-      console.log('Checking if Pi SDK is ready...');
+      logMessage('Checking if Pi SDK is ready...');
       const timeoutMs = 30000;
       const startTime = Date.now();
       while (!window.Pi && (Date.now() - startTime) < timeoutMs) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       if (!window.Pi) {
-        console.error('Pi SDK initialization timed out after', timeoutMs, 'ms');
+        logMessage(`Pi SDK initialization timed out after ${timeoutMs} ms`, true);
         return false;
       }
-      console.log('Pi SDK is ready:', window.Pi);
+      logMessage(`Pi SDK is ready: ${JSON.stringify(window.Pi)}`);
       return true;
+    }
+
+    // Test authentication
+    async function testAuthentication() {
+      const errorMessage = document.getElementById('error-message');
+      const loadingMessage = document.getElementById('loading-message');
+      errorMessage.textContent = '';
+      loadingMessage.textContent = 'Testing authentication...';
+      logMessage('Starting testAuthentication');
+
+      try {
+        if (!window.Pi) {
+          logMessage('window.Pi is undefined, attempting to load SDK...');
+          let sdkLoaded = false;
+          sdkLoadAttempts = 0;
+          for (const url of sdkUrls) {
+            sdkLoadAttempts++;
+            logMessage(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
+            sdkLoaded = await loadSdk(url);
+            if (sdkLoaded) break;
+          }
+          if (!sdkLoaded || !window.Pi) {
+            throw new Error(`Pi SDK unavailable after ${sdkLoadAttempts} attempts`);
+          }
+        }
+
+        const isReady = await ensurePiSDKReady();
+        if (!isReady) {
+          throw new Error('Pi SDK failed to initialize');
+        }
+
+        logMessage('Initializing Pi SDK with appId: marketmate, version: 2.0');
+        try {
+          await window.Pi.init({
+            version: '2.0',
+            sandbox: true,
+            appId: 'marketmate'
+          });
+          logMessage('Pi.init succeeded');
+        } catch (err) {
+          throw new Error(`Pi SDK initialization failed: ${err.message}`);
+        }
+
+        logMessage('Authenticating user with payments scope...');
+        const authPromise = window.Pi.authenticate(
+          ['payments'],
+          () => {
+            logMessage('Authentication cancelled by user');
+            errorMessage.textContent = 'Authentication cancelled by user.';
+            loadingMessage.textContent = '';
+          }
+        );
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
+        });
+        const authResult = await Promise.race([authPromise, timeoutPromise]);
+        logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
+        errorMessage.textContent = 'Authentication succeeded!';
+      } catch (err) {
+        logMessage(`Test authentication failed: ${err.message}`, true);
+        errorMessage.textContent = `Test authentication failed: ${err.message}`;
+      }
+      loadingMessage.textContent = '';
     }
 
     // Initialize payment
@@ -134,84 +213,107 @@
       const amountInput = document.getElementById('amount');
       const amount = parseFloat(amountInput.value);
       const errorMessage = document.getElementById('error-message');
+      const loadingMessage = document.getElementById('loading-message');
+      const bypassInit = new URLSearchParams(window.location.search).get('bypassInit') === 'true';
+      const bypassAuth = new URLSearchParams(window.location.search).get('bypassAuth') === 'true';
 
       errorMessage.textContent = '';
-      console.log('Starting initiatePayment with amount:', amount);
+      loadingMessage.textContent = 'Processing payment...';
+      logMessage(`Starting initiatePayment with amount: ${amount}, bypassInit: ${bypassInit}, bypassAuth: ${bypassAuth}`);
+
       try {
         if (!amount || amount <= 0) {
           errorMessage.textContent = 'Please enter a valid Pi amount.';
-          console.error('Invalid amount:', amount);
+          logMessage(`Invalid amount: ${amount}`, true);
+          loadingMessage.textContent = '';
           return;
         }
 
         if (!isPiBrowser()) {
-          console.warn('isPiBrowser returned false, proceeding anyway for testing...');
+          logMessage('isPiBrowser returned false, proceeding anyway for testing...');
         }
 
-        console.log('Checking window.Pi before loading SDK...');
+        logMessage('Checking window.Pi before loading SDK...');
         if (!window.Pi) {
-          console.warn('window.Pi is undefined, attempting to load SDK...');
+          logMessage('window.Pi is undefined, attempting to load SDK...');
           sdkLoadAttempts = 0;
           let sdkLoaded = false;
           for (const url of sdkUrls) {
             sdkLoadAttempts++;
-            console.log(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
+            logMessage(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
             try {
               sdkLoaded = await loadSdk(url);
               if (sdkLoaded) break;
             } catch (err) {
-              console.error(`SDK load attempt ${sdkLoadAttempts} failed:`, err.message);
+              logMessage(`SDK load attempt ${sdkLoadAttempts} failed: ${err.message}`, true);
             }
           }
           if (!sdkLoaded || !window.Pi) {
             errorMessage.textContent = 'Pi SDK is not available. Please ensure you\'re in the Pi Browser.';
-            console.error('Pi SDK unavailable after', sdkLoadAttempts, 'attempts');
+            logMessage(`Pi SDK unavailable after ${sdkLoadAttempts} attempts`, true);
+            loadingMessage.textContent = '';
             return;
           }
         }
 
-        console.log('Pi SDK object:', window.Pi);
+        logMessage(`Pi SDK object: ${JSON.stringify(window.Pi)}`);
         const isReady = await ensurePiSDKReady();
         if (!isReady) {
           errorMessage.textContent = 'Pi SDK failed to initialize. Please try again.';
-          console.error('Pi SDK not ready');
+          logMessage('Pi SDK not ready', true);
+          loadingMessage.textContent = '';
           return;
         }
 
         // Initialize Pi SDK
-        console.log('Initializing Pi SDK with appId: marketmate, version: 2.0');
-        try {
-          await window.Pi.init({
-            version: '2.0',
-            sandbox: true,
-            appId: 'marketmate'
-          });
-          console.log('Pi.init succeeded');
-        } catch (err) {
-          console.error('Pi.init failed:', err.message, err.stack);
-          errorMessage.textContent = 'Pi SDK initialization failed: ' + err.message;
-          return;
+        if (!bypassInit) {
+          logMessage('Initializing Pi SDK with appId: marketmate, version: 2.0');
+          try {
+            await window.Pi.init({
+              version: '2.0',
+              sandbox: true,
+              appId: 'marketmate'
+            });
+            logMessage('Pi.init succeeded');
+          } catch (err) {
+            errorMessage.textContent = `Pi SDK initialization failed: ${err.message}`;
+            logMessage(`Pi.init failed: ${err.message}`, true);
+            loadingMessage.textContent = '';
+            return;
+          }
+        } else {
+          logMessage('Bypassing Pi.init for testing...');
         }
 
         // Authenticate user
-        console.log('Authenticating user with payments scope...');
-        try {
-          const authResult = await window.Pi.authenticate(
-            ['payments'],
-            () => {
-              console.log('Authentication cancelled by user');
-              errorMessage.textContent = 'Authentication cancelled by user.';
-            }
-          );
-          console.log('User authenticated:', authResult);
-        } catch (err) {
-          console.error('Authentication failed:', err.message, err.stack);
-          errorMessage.textContent = 'Authentication failed: ' + err.message;
-          return;
+        if (!bypassAuth) {
+          logMessage('Authenticating user with payments scope...');
+          try {
+            const authPromise = window.Pi.authenticate(
+              ['payments'],
+              () => {
+                logMessage('Authentication cancelled by user');
+                errorMessage.textContent = 'Authentication cancelled by user.';
+                loadingMessage.textContent = '';
+              }
+            );
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
+            });
+            const authResult = await Promise.race([authPromise, timeoutPromise]);
+            logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
+          } catch (err) {
+            errorMessage.textContent = `Authentication failed: ${err.message}`;
+            logMessage(`Authentication failed: ${err.message}`, true);
+            loadingMessage.textContent = '';
+            return;
+          }
+        } else {
+          logMessage('Bypassing authentication for testing...');
         }
 
         // Create payment
-        console.log(`Creating payment for ${amount} Pi...`);
+        logMessage(`Creating payment for ${amount} Pi...`);
         try {
           const payment = await window.Pi.createPayment({
             amount: amount,
@@ -219,7 +321,7 @@
             metadata: { orderId: `order_${Date.now()}` }
           }, {
             onReadyForServerApproval: async (paymentId) => {
-              console.log('Payment ready for approval:', paymentId);
+              logMessage(`Payment ready for approval: ${paymentId}`);
               try {
                 const response = await fetch('/api/payments/approve', {
                   method: 'POST',
@@ -228,16 +330,16 @@
                 });
                 const result = await response.json();
                 if (!result.success) {
-                  throw new Error('Approval failed: ' + (result.error || 'Unknown error'));
+                  throw new Error(`Approval failed: ${result.error || 'Unknown error'}`);
                 }
-                console.log('Payment approved:', result);
+                logMessage(`Payment approved: ${JSON.stringify(result)}`);
               } catch (err) {
-                console.error('Approval error:', err.message);
+                logMessage(`Approval error: ${err.message}`, true);
                 throw err;
               }
             },
             onReadyForServerCompletion: async (paymentId, txid) => {
-              console.log('Payment ready for completion:', paymentId, txid);
+              logMessage(`Payment ready for completion: ${paymentId}, txid: ${txid}`);
               try {
                 const response = await fetch('/api/payments/complete', {
                   method: 'POST',
@@ -246,34 +348,38 @@
                 });
                 const result = await response.json();
                 if (!result.success) {
-                  throw new Error('Completion failed: ' + (result.error || 'Unknown error'));
+                  throw new Error(`Completion failed: ${result.error || 'Unknown error'}`);
                 }
-                console.log('Payment completed:', result);
+                logMessage(`Payment completed: ${JSON.stringify(result)}`);
               } catch (err) {
-                console.error('Completion error:', err.message);
+                logMessage(`Completion error: ${err.message}`, true);
                 throw err;
               }
             },
             onCancel: () => {
-              console.log('Payment cancelled');
+              logMessage('Payment cancelled');
               errorMessage.textContent = 'Payment was cancelled.';
+              loadingMessage.textContent = '';
             },
             onError: (err) => {
-              console.error('Payment error:', err.message);
-              errorMessage.textContent = 'Payment failed: ' + err.message;
+              logMessage(`Payment error: ${err.message}`, true);
+              errorMessage.textContent = `Payment failed: ${err.message}`;
+              loadingMessage.textContent = '';
             }
           });
-          console.log('Payment created:', payment);
+          logMessage(`Payment created: ${JSON.stringify(payment)}`);
           errorMessage.textContent = 'Payment initiated! Check Pi wallet.';
         } catch (err) {
-          console.error('Payment creation failed:', err.message, err.stack);
-          errorMessage.textContent = 'Payment failed: ' + err.message;
+          errorMessage.textContent = `Payment failed: ${err.message}`;
+          logMessage(`Payment creation failed: ${err.message}`, true);
+          loadingMessage.textContent = '';
           return;
         }
       } catch (error) {
-        console.error('Error in initiatePayment:', error.message, error.stack);
-        errorMessage.textContent = 'An error occurred: ' + error.message;
+        errorMessage.textContent = `An error occurred: ${error.message}`;
+        logMessage(`Error in initiatePayment: ${error.message}`, true);
       }
+      loadingMessage.textContent = '';
     }
   </script>
 </body>
