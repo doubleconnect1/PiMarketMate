@@ -78,6 +78,7 @@
   <button onclick="testUsernameAuth()">Test Username Auth</button>
   <button onclick="testNetwork()">Test Network</button>
   <button onclick="testAppId()">Test App ID</button>
+  <button onclick="checkStoredAuth()">Check Stored Auth</button>
   <br>
   <label><input type="checkbox" id="debugMode" checked> Enable Debug Mode</label>
   <div id="loading-message"></div>
@@ -147,6 +148,49 @@
       }
       logMessage(`Pi SDK is ready: ${JSON.stringify(window.Pi)}`);
       return true;
+    }
+
+    // Store authentication result
+    function storeAuthResult(authResult) {
+      try {
+        localStorage.setItem('piAuth', JSON.stringify(authResult));
+        logMessage(`Stored auth result: ${JSON.stringify(authResult)}`);
+      } catch (err) {
+        logMessage(`Failed to store auth result: ${err.message}`, true);
+      }
+    }
+
+    // Retrieve stored authentication
+    function getStoredAuth() {
+      try {
+        const auth = localStorage.getItem('piAuth');
+        if (auth) {
+          logMessage(`Retrieved stored auth: ${auth}`);
+          return JSON.parse(auth);
+        }
+        logMessage('No stored auth found');
+        return null;
+      } catch (err) {
+        logMessage(`Failed to retrieve stored auth: ${err.message}`, true);
+        return null;
+      }
+    }
+
+    // Check stored authentication
+    function checkStoredAuth() {
+      const errorMessage = document.getElementById('error-message');
+      const loadingMessage = document.getElementById('loading-message');
+      errorMessage.textContent = '';
+      loadingMessage.textContent = 'Checking stored authentication...';
+      logMessage('Starting checkStoredAuth');
+
+      const auth = getStoredAuth();
+      if (auth) {
+        errorMessage.textContent = `Stored auth: UID=${auth.user?.uid}, Username=${auth.user?.username || 'N/A'}, Token=${auth.accessToken?.substring(0, 10)}...`;
+      } else {
+        errorMessage.textContent = 'No stored authentication found.';
+      }
+      loadingMessage.textContent = '';
     }
 
     // Test network connectivity
@@ -249,6 +293,7 @@
         });
         const authResult = await Promise.race([authPromise, timeoutPromise]);
         logMessage(`Minimal authentication succeeded: ${JSON.stringify(authResult)}`);
+        storeAuthResult(authResult);
         errorMessage.textContent = 'Minimal authentication succeeded!';
       } catch (err) {
         logMessage(`Minimal authentication failed: ${err.message}`, true);
@@ -313,6 +358,7 @@
         });
         const authResult = await Promise.race([authPromise, timeoutPromise]);
         logMessage(`Username authentication succeeded: ${JSON.stringify(authResult)}`);
+        storeAuthResult(authResult);
         errorMessage.textContent = 'Username authentication succeeded!';
       } catch (err) {
         logMessage(`Username authentication failed: ${err.message}`, true);
@@ -377,6 +423,7 @@
         });
         const authResult = await Promise.race([authPromise, timeoutPromise]);
         logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
+        storeAuthResult(authResult);
         errorMessage.textContent = 'Authentication succeeded!';
       } catch (err) {
         logMessage(`Test authentication failed: ${err.message}`, true);
@@ -458,28 +505,35 @@
           return;
         }
 
-        // Authenticate user
+        // Check stored authentication
+        let authResult = null;
         if (!bypassAuth) {
-          logMessage('Authenticating user with payments scope...');
-          try {
-            const authPromise = window.Pi.authenticate(
-              ['payments'],
-              () => {
-                logMessage('Authentication cancelled by user');
-                errorMessage.textContent = 'Authentication cancelled by user.';
-                loadingMessage.textContent = '';
-              }
-            );
-            const timeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
-            });
-            const authResult = await Promise.race([authPromise, timeoutPromise]);
-            logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
-          } catch (err) {
-            errorMessage.textContent = `Authentication failed: ${err.message}`;
-            logMessage(`Authentication failed: ${err.message}`, true);
-            loadingMessage.textContent = '';
-            return;
+          authResult = getStoredAuth();
+          if (authResult && authResult.accessToken) {
+            logMessage('Using stored authentication');
+          } else {
+            logMessage('No valid stored authentication, authenticating user with payments scope...');
+            try {
+              const authPromise = window.Pi.authenticate(
+                ['payments'],
+                () => {
+                  logMessage('Authentication cancelled by user');
+                  errorMessage.textContent = 'Authentication cancelled by user.';
+                  loadingMessage.textContent = '';
+                }
+              );
+              const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
+              });
+              authResult = await Promise.race([authPromise, timeoutPromise]);
+              logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
+              storeAuthResult(authResult);
+            } catch (err) {
+              errorMessage.textContent = `Authentication failed: ${err.message}`;
+              logMessage(`Authentication failed: ${err.message}`, true);
+              loadingMessage.textContent = '';
+              return;
+            }
           }
         } else {
           logMessage('Bypassing authentication for testing...');
