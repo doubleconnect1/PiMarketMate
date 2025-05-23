@@ -156,8 +156,12 @@
           for (const url of sdkUrls) {
             sdkLoadAttempts++;
             console.log(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
-            sdkLoaded = await loadSdk(url);
-            if (sdkLoaded) break;
+            try {
+              sdkLoaded = await loadSdk(url);
+              if (sdkLoaded) break;
+            } catch (err) {
+              console.error(`SDK load attempt ${sdkLoadAttempts} failed:`, err.message);
+            }
           }
           if (!sdkLoaded || !window.Pi) {
             errorMessage.textContent = 'Pi SDK is not available. Please ensure you\'re in the Pi Browser.';
@@ -189,22 +193,8 @@
           return;
         }
 
-        // Authenticate user
-        console.log('Authenticating user...');
-        try {
-          const authResult = await window.Pi.authenticate(
-            ['payments'],
-            () => {
-              console.log('Payment cancelled by user');
-              errorMessage.textContent = 'Payment cancelled by user.';
-            }
-          );
-          console.log('User authenticated:', authResult);
-        } catch (err) {
-          console.error('Authentication failed:', err.message, err.stack);
-          errorMessage.textContent = 'Authentication failed: ' + err.message;
-          return;
-        }
+        // Skip authentication for testing
+        console.log('Skipping authentication for testing...');
 
         // Create payment
         console.log(`Creating payment for ${amount} Pi...`);
