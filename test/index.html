@@ -42,7 +42,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pi Market Mate - Simple Payment</title>
+  <title>Pi Market Mate - Sample Payment</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -51,12 +51,12 @@
       padding: 20px;
       text-align: center;
     }
-    input, button {
+    button {
       padding: 10px;
       margin: 10px;
       font-size: 16px;
     }
-    #error-message, #loading-message {
+    #error-message, #loading-message, #username {
       margin-top: 10px;
     }
     #error-message {
@@ -65,34 +65,30 @@
     #loading-message {
       color: blue;
     }
+    #username {
+      color: green;
+    }
   </style>
 </head>
 <body>
   <h1>Pi Market Mate</h1>
-  <p>Enter amount in Pi and pay:</p>
-  <input type="number" id="amount" placeholder="Enter Pi amount" step="0.01" min="0">
-  <br>
-  <button onclick="initiatePayment()">Pay with Pi</button>
-  <button onclick="testAuthentication()">Test Authentication</button>
-  <button onclick="testMinimalAuth()">Test Minimal Auth</button>
-  <button onclick="testUsernameAuth()">Test Username Auth</button>
-  <button onclick="testNetwork()">Test Network</button>
-  <button onclick="testAppId()">Test App ID</button>
+  <p>Pay 0.01 Pi to test:</p>
+  <button onclick="createPayment()">Pay 0.01 Pi</button>
   <button onclick="checkStoredAuth()">Check Stored Auth</button>
   <button onclick="clearStoredAuth()">Clear Stored Auth</button>
-  <button onclick="initAuthOnLoad()">Init Auth</button>
+  <button onclick="testNetwork()">Test Network</button>
   <br>
   <label><input type="checkbox" id="debugMode" checked> Enable Debug Mode</label>
+  <div id="username"></div>
   <div id="loading-message"></div>
   <div id="error-message"></div>
 
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
   <script>
-    const sdkUrls = [
-      'https://sdk.minepi.com/pi-sdk.js',
-      'https://cdn.jsdelivr.net/npm/@pi-network/pi-sdk@2.0.0/dist/pi-sdk.min.js'
-    ];
-    let sdkLoadAttempts = 0;
-    let isInitializing = false;
+    // Configuration
+    const appId = 'marketmate';
+    const sdkVersion = '2.0';
+    const sandbox = new URLSearchParams(window.location.search).get('useSandbox') !== 'false';
 
     // Utility to log messages
     function logMessage(message, isError = false) {
@@ -101,40 +97,17 @@
       }
     }
 
-    // Load Pi SDK
-    async function loadSdk(url) {
-      logMessage(`Attempting to load SDK from: ${url}`);
+    // Initialize Pi SDK
+    async function initPiSDK() {
+      logMessage(`Initializing Pi SDK with appId: ${appId}, version: ${sdkVersion}, sandbox: ${sandbox}`);
       try {
-        const script = document.createElement('script');
-        script.src = url;
-        script.async = true;
-        const loadPromise = new Promise((resolve, reject) => {
-          script.onload = () => {
-            logMessage(`SDK loaded successfully from: ${url}`);
-            logMessage(`Pi SDK version: ${window.Pi ? (window.Pi.version || 'unknown') : 'not loaded'}`);
-            resolve(true);
-          };
-          script.onerror = () => {
-            logMessage(`Failed to load SDK from: ${url}`, true);
-            reject(new Error(`Failed to load SDK from ${url}`));
-          };
-        });
-        document.head.appendChild(script);
-        await loadPromise;
+        await window.Pi.init({ version: sdkVersion, sandbox: sandbox, appId: appId });
+        logMessage('Pi.init succeeded');
         return true;
-      } catch (error) {
-        logMessage(`SDK load error: ${error.message}`, true);
-        return false;
+      } catch (err) {
+        logMessage(`Pi.init failed: ${err.message}, Stack: ${err.stack}`, true);
+        throw err;
       }
-    }
-
-    // Check if in Pi Browser
-    function isPiBrowser() {
-      const userAgent = navigator.userAgent.toLowerCase();
-      const hostname = window.location.hostname.toLowerCase();
-      const isPi = userAgent.includes('pi') || hostname.includes('minepi') || hostname.includes('pimarketmate');
-      logMessage(`Pi Browser check: ${JSON.stringify({ isPi, userAgent, hostname })}`);
-      return isPi;
     }
 
     // Ensure Pi SDK is ready
@@ -149,7 +122,7 @@
         logMessage(`Pi SDK initialization timed out after ${timeoutMs} ms`, true);
         return false;
       }
-      logMessage(`Pi SDK is ready: ${JSON.stringify(window.Pi)}`);
+      logMessage(`Pi SDK version: ${window.Pi.version || 'unknown'}`);
       return true;
     }
 
@@ -235,485 +208,126 @@
       loadingMessage.textContent = '';
     }
 
-    // Test App ID registration
-    async function testAppId() {
+    // Authenticate and create payment
+    async function createPayment() {
       const errorMessage = document.getElementById('error-message');
       const loadingMessage = document.getElementById('loading-message');
-      errorMessage.textContent = '';
-      loadingMessage.textContent = 'Testing App ID registration...';
-      logMessage('Starting testAppId');
-
-      try {
-        const sandbox = new URLSearchParams(window.location.search).get('useSandbox') !== 'false';
-        const testUrl = sandbox
-          ? 'https://sandbox.minepi.com/mobile-app-ui/app/marketmate'
-          : 'https://api.minepi.com/mobile-app-ui/app/marketmate';
-        logMessage(`Testing App ID at: ${testUrl}`);
-        const response = await fetch(testUrl, { method: 'GET', mode: 'no-cors' });
-        logMessage(`App ID test to ${testUrl} succeeded`);
-        errorMessage.textContent = `App ID test succeeded (check logs for details).`;
-      } catch (err) {
-        logMessage(`App ID test failed: ${err.message}`, true);
-        errorMessage.textContent = `App ID test failed: ${err.message}`;
-      }
-      loadingMessage.textContent = '';
-    }
-
-    // Test minimal authentication (no scopes)
-    async function testMinimalAuth() {
-      const errorMessage = document.getElementById('error-message');
-      const loadingMessage = document.getElementById('loading-message');
-      errorMessage.textContent = '';
-      loadingMessage.textContent = 'Testing minimal authentication...';
-      logMessage('Starting testMinimalAuth');
-
-      try {
-        if (!window.Pi) {
-          logMessage('window.Pi is undefined, attempting to load SDK...');
-          sdkLoadAttempts = 0;
-          let sdkLoaded = false;
-          for (const url of sdkUrls) {
-            sdkLoadAttempts++;
-            logMessage(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
-            sdkLoaded = await loadSdk(url);
-            if (sdkLoaded) break;
-          }
-          if (!sdkLoaded || !window.Pi) {
-            throw new Error(`Pi SDK unavailable after ${sdkLoadAttempts} attempts`);
-          }
-        }
-
-        const isReady = await ensurePiSDKReady();
-        if (!isReady) {
-          throw new Error('Pi SDK failed to initialize');
-        }
-
-        const sandbox = new URLSearchParams(window.location.search).get('useSandbox') !== 'false';
-        logMessage(`Initializing Pi SDK with appId: marketmate, version: 2.0, sandbox: ${sandbox}`);
-        try {
-          await window.Pi.init({
-            version: '2.0',
-            sandbox: sandbox,
-            appId: 'marketmate'
-          });
-          logMessage('Pi.init succeeded');
-        } catch (err) {
-          throw new Error(`Pi SDK initialization failed: ${err.message}`);
-        }
-
-        logMessage('Authenticating user with no scopes...');
-        const authPromise = window.Pi.authenticate(
-          [],
-          () => {
-            logMessage('Minimal authentication cancelled by user');
-            errorMessage.textContent = 'Minimal authentication cancelled by user.';
-            loadingMessage.textContent = '';
-          }
-        );
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Minimal authentication timed out after 10 seconds')), 10000);
-        });
-        const authResult = await Promise.race([authPromise, timeoutPromise]);
-        logMessage(`Minimal authentication succeeded: ${JSON.stringify(authResult)}`);
-        storeAuthResult(authResult);
-        errorMessage.textContent = 'Minimal authentication succeeded!';
-      } catch (err) {
-        logMessage(`Minimal authentication failed: ${err.message}`, true);
-        errorMessage.textContent = `Minimal authentication failed: ${err.message}`;
-      }
-      loadingMessage.textContent = '';
-    }
-
-    // Test username authentication
-    async function testUsernameAuth() {
-      const errorMessage = document.getElementById('error-message');
-      const loadingMessage = document.getElementById('loading-message');
-      errorMessage.textContent = '';
-      loadingMessage.textContent = 'Testing username authentication...';
-      logMessage('Starting testUsernameAuth');
-
-      try {
-        if (!window.Pi) {
-          logMessage('window.Pi is undefined, attempting to load SDK...');
-          sdkLoadAttempts = 0;
-          let sdkLoaded = false;
-          for (const url of sdkUrls) {
-            sdkLoadAttempts++;
-            logMessage(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
-            sdkLoaded = await loadSdk(url);
-            if (sdkLoaded) break;
-          }
-          if (!sdkLoaded || !window.Pi) {
-            throw new Error(`Pi SDK unavailable after ${sdkLoadAttempts} attempts`);
-          }
-        }
-
-        const isReady = await ensurePiSDKReady();
-        if (!isReady) {
-          throw new Error('Pi SDK failed to initialize');
-        }
-
-        const sandbox = new URLSearchParams(window.location.search).get('useSandbox') !== 'false';
-        logMessage(`Initializing Pi SDK with appId: marketmate, version: 2.0, sandbox: ${sandbox}`);
-        try {
-          await window.Pi.init({
-            version: '2.0',
-            sandbox: sandbox,
-            appId: 'marketmate'
-          });
-          logMessage('Pi.init succeeded');
-        } catch (err) {
-          throw new Error(`Pi SDK initialization failed: ${err.message}`);
-        }
-
-        logMessage('Authenticating user with username scope...');
-        const authPromise = window.Pi.authenticate(
-          ['username'],
-          () => {
-            logMessage('Username authentication cancelled by user');
-            errorMessage.textContent = 'Username authentication cancelled by user.';
-            loadingMessage.textContent = '';
-          }
-        );
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Username authentication timed out after 10 seconds')), 10000);
-        });
-        const authResult = await Promise.race([authPromise, timeoutPromise]);
-        logMessage(`Username authentication succeeded: ${JSON.stringify(authResult)}`);
-        storeAuthResult(authResult);
-        errorMessage.textContent = 'Username authentication succeeded!';
-      } catch (err) {
-        logMessage(`Username authentication failed: ${err.message}`, true);
-        errorMessage.textContent = `Username authentication failed: ${err.message}`;
-      }
-      loadingMessage.textContent = '';
-    }
-
-    // Test authentication (with payments scope)
-    async function testAuthentication() {
-      const errorMessage = document.getElementById('error-message');
-      const loadingMessage = document.getElementById('loading-message');
-      errorMessage.textContent = '';
-      loadingMessage.textContent = 'Testing authentication...';
-      logMessage('Starting testAuthentication');
-
-      try {
-        if (!window.Pi) {
-          logMessage('window.Pi is undefined, attempting to load SDK...');
-          sdkLoadAttempts = 0;
-          let sdkLoaded = false;
-          for (const url of sdkUrls) {
-            sdkLoadAttempts++;
-            logMessage(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
-            sdkLoaded = await loadSdk(url);
-            if (sdkLoaded) break;
-          }
-          if (!sdkLoaded || !window.Pi) {
-            throw new Error(`Pi SDK unavailable after ${sdkLoadAttempts} attempts`);
-          }
-        }
-
-        const isReady = await ensurePiSDKReady();
-        if (!isReady) {
-          throw new Error('Pi SDK failed to initialize');
-        }
-
-        const sandbox = new URLSearchParams(window.location.search).get('useSandbox') !== 'false';
-        logMessage(`Initializing Pi SDK with appId: marketmate, version: 2.0, sandbox: ${sandbox}`);
-        try {
-          await window.Pi.init({
-            version: '2.0',
-            sandbox: sandbox,
-            appId: 'marketmate'
-          });
-          logMessage('Pi.init succeeded');
-        } catch (err) {
-          throw new Error(`Pi SDK initialization failed: ${err.message}`);
-        }
-
-        logMessage('Authenticating user with payments scope...');
-        const authPromise = window.Pi.authenticate(
-          ['payments'],
-          () => {
-            logMessage('Authentication cancelled by user');
-            errorMessage.textContent = 'Authentication cancelled by user.';
-            loadingMessage.textContent = '';
-          }
-        );
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
-        });
-        const authResult = await Promise.race([authPromise, timeoutPromise]);
-        logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
-        storeAuthResult(authResult);
-        errorMessage.textContent = 'Authentication succeeded!';
-      } catch (err) {
-        logMessage(`Test authentication failed: ${err.message}`, true);
-        errorMessage.textContent = `Test authentication failed: ${err.message}`;
-      }
-      loadingMessage.textContent = '';
-    }
-
-    // Initialize payment
-    async function initiatePayment() {
-      const amountInput = document.getElementById('amount');
-      const amount = parseFloat(amountInput.value);
-      const errorMessage = document.getElementById('error-message');
-      const loadingMessage = document.getElementById('loading-message');
-      const bypassAuth = new URLSearchParams(window.location.search).get('bypassAuth') === 'true';
-      const sandbox = new URLSearchParams(window.location.search).get('useSandbox') !== 'false';
-
+      const usernameDisplay = document.getElementById('username');
       errorMessage.textContent = '';
       loadingMessage.textContent = 'Processing payment...';
-      logMessage(`Starting initiatePayment with amount: ${amount}, bypassAuth: ${bypassAuth}, sandbox: ${sandbox}`);
+      logMessage('Starting createPayment');
 
       try {
-        if (!amount || amount <= 0) {
-          errorMessage.textContent = 'Please enter a valid Pi amount.';
-          logMessage(`Invalid amount: ${amount}`, true);
+        if (!window.Pi) {
+          logMessage('Pi SDK not loaded', true);
+          errorMessage.textContent = 'Pi SDK not loaded. Please ensure you\'re in the Pi Browser.';
           loadingMessage.textContent = '';
           return;
         }
 
-        if (!isPiBrowser()) {
-          logMessage('isPiBrowser returned false, proceeding anyway for testing...');
+        const isReady = await ensurePiSDKReady();
+        if (!isReady) {
+          logMessage('Pi SDK not ready', true);
+          errorMessage.textContent = 'Pi SDK failed to initialize.';
+          loadingMessage.textContent = '';
+          return;
         }
 
-        logMessage('Checking window.Pi before loading SDK...');
-        if (!window.Pi) {
-          logMessage('window.Pi is undefined, attempting to load SDK...');
-          sdkLoadAttempts = 0;
-          let sdkLoaded = false;
-          for (const url of sdkUrls) {
-            sdkLoadAttempts++;
-            logMessage(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
-            try {
-              sdkLoaded = await loadSdk(url);
-              if (sdkLoaded) break;
-            } catch (err) {
-              logMessage(`SDK load attempt ${sdkLoadAttempts} failed: ${err.message}`, true);
-            }
-          }
-          if (!sdkLoaded || !window.Pi) {
-            errorMessage.textContent = 'Pi SDK is not available. Please ensure you\'re in the Pi Browser.';
-            logMessage(`Pi SDK unavailable after ${sdkLoadAttempts} attempts`, true);
+        await initPiSDK();
+
+        // Check stored authentication
+        let authResult = getStoredAuth();
+        if (!authResult || !authResult.accessToken) {
+          logMessage('No valid stored authentication, authenticating user...');
+          const scopes = ['payments', 'username'];
+          try {
+            authResult = await Promise.race([
+              window.Pi.authenticate(scopes, (payment) => {
+                logMessage(`Incomplete payment found: ${payment.identifier}`);
+                // Handle incomplete payment if needed
+              }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000))
+            ]);
+            logMessage(`Authentication succeeded: ${JSON.stringify(authResult)}`);
+            storeAuthResult(authResult);
+          } catch (err) {
+            logMessage(`Authentication failed: ${err.message}, Stack: ${err.stack}`, true);
+            errorMessage.textContent = `Authentication failed: ${err.message}`;
             loadingMessage.textContent = '';
             return;
           }
         }
 
-        logMessage(`Pi SDK object: ${JSON.stringify(window.Pi)}`);
-        const isReady = await ensurePiSDKReady();
-        if (!isReady) {
-          errorMessage.textContent = 'Pi SDK failed to initialize. Please try again.';
-          logMessage('Pi SDK not ready', true);
-          loadingMessage.textContent = '';
-          return;
-        }
-
-        // Initialize Pi SDK
-        logMessage(`Initializing Pi SDK with appId: marketmate, version: 2.0, sandbox: ${sandbox}`);
-        try {
-          await window.Pi.init({
-            version: '2.0',
-            sandbox: sandbox,
-            appId: 'marketmate'
-          });
-          logMessage('Pi.init succeeded');
-        } catch (err) {
-          errorMessage.textContent = `Pi SDK initialization failed: ${err.message}`;
-          logMessage(`Pi.init failed: ${err.message}`, true);
-          loadingMessage.textContent = '';
-          return;
-        }
-
-        // Check stored authentication
-        let authResult = null;
-        if (!bypassAuth) {
-          authResult = getStoredAuth();
-          if (authResult && authResult.accessToken) {
-            logMessage('Using stored authentication');
-          } else {
-            logMessage('No valid stored authentication, authenticating user with payments scope...');
-            try {
-              const authPromise = window.Pi.authenticate(
-                ['payments'],
-                () => {
-                  logMessage('Authentication cancelled by user');
-                  errorMessage.textContent = 'Authentication cancelled by user.';
-                  loadingMessage.textContent = '';
-                }
-              );
-              const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
-              });
-              authResult = await Promise.race([authPromise, timeoutPromise]);
-              logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
-              storeAuthResult(authResult);
-            } catch (err) {
-              errorMessage.textContent = `Authentication failed: ${err.message}`;
-              logMessage(`Authentication failed: ${err.message}`, true);
-              loadingMessage.textContent = '';
-              return;
-            }
-          }
-        } else {
-          logMessage('Bypassing authentication for testing...');
+        // Display username
+        if (authResult.user && authResult.user.username) {
+          usernameDisplay.textContent = `Hello, ${authResult.user.username}!`;
+          logMessage(`Displayed username: ${authResult.user.username}`);
         }
 
         // Create payment
-        logMessage(`Creating payment for ${amount} Pi...`);
-        try {
-          const payment = await window.Pi.createPayment({
-            amount: amount,
-            memo: 'Payment for Pi Market Mate',
-            metadata: { orderId: `order_${Date.now()}` }
-          }, {
-            onReadyForServerApproval: async (paymentId) => {
-              logMessage(`Payment ready for approval: ${paymentId}`);
-              try {
-                const response = await fetch('/api/payments/approve', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ paymentId })
-                });
-                const result = await response.json();
-                if (!result.success) {
-                  throw new Error(`Approval failed: ${result.error || 'Unknown error'}`);
-                }
-                logMessage(`Payment approved: ${JSON.stringify(result)}`);
-              } catch (err) {
-                logMessage(`Approval error: ${err.message}`, true);
-                throw err;
+        logMessage('Creating payment for 0.01 Pi...');
+        const paymentData = {
+          amount: 0.01,
+          memo: 'Test payment for Pi Market Mate',
+          metadata: { orderId: `order_${Date.now()}` }
+        };
+        const paymentCallbacks = {
+          onReadyForServerApproval: async (paymentId) => {
+            logMessage(`Payment ready for approval: ${paymentId}`);
+            try {
+              const response = await fetch('/api/payments/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId })
+              });
+              const result = await response.json();
+              if (!result.success) {
+                throw new Error(`Approval failed: ${result.error || 'Unknown error'}`);
               }
-            },
-            onReadyForServerCompletion: async (paymentId, txid) => {
-              logMessage(`Payment ready for completion: ${paymentId}, txid: ${txid}`);
-              try {
-                const response = await fetch('/api/payments/complete', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ paymentId, txid })
-                });
-                const result = await response.json();
-                if (!result.success) {
-                  throw new Error(`Completion failed: ${result.error || 'Unknown error'}`);
-                }
-                logMessage(`Payment completed: ${JSON.stringify(result)}`);
-              } catch (err) {
-                logMessage(`Completion error: ${err.message}`, true);
-                throw err;
-              }
-            },
-            onCancel: () => {
-              logMessage('Payment cancelled');
-              errorMessage.textContent = 'Payment was cancelled.';
-              loadingMessage.textContent = '';
-            },
-            onError: (err) => {
-              logMessage(`Payment error: ${err.message}`, true);
-              errorMessage.textContent = `Payment failed: ${err.message}`;
-              loadingMessage.textContent = '';
+              logMessage(`Payment approved: ${JSON.stringify(result)}`);
+            } catch (err) {
+              logMessage(`Approval error: ${err.message}`, true);
+              throw err;
             }
-          });
-          logMessage(`Payment created: ${JSON.stringify(payment)}`);
-          errorMessage.textContent = 'Payment initiated! Check Pi wallet.';
-        } catch (err) {
-          errorMessage.textContent = `Payment failed: ${err.message}`;
-          logMessage(`Payment creation failed: ${err.message}`, true);
-          loadingMessage.textContent = '';
-          return;
-        }
-      } catch (err) {
-        errorMessage.textContent = `An error occurred: ${err.message}`;
-        logMessage(`Error in initiatePayment: ${err.message}`, true);
-        loadingMessage.textContent = '';
-      }
-    }
-
-    // Trigger authentication manually
-    async function initAuthOnLoad() {
-      const errorMessage = document.getElementById('error-message');
-      const loadingMessage = document.getElementById('loading-message');
-      errorMessage.textContent = '';
-      loadingMessage.textContent = 'Initializing authentication...';
-      logMessage('Starting initAuthOnLoad');
-
-      if (isInitializing) {
-        logMessage('Initialization already in progress, skipping...');
-        errorMessage.textContent = 'Initialization already in progress.';
-        loadingMessage.textContent = '';
-        return;
-      }
-
-      isInitializing = true;
-
-      try {
-        if (!window.Pi) {
-          logMessage('window.Pi is undefined, attempting to load SDK...');
-          sdkLoadAttempts = 0;
-          let sdkLoaded = false;
-          for (const url of sdkUrls) {
-            sdkLoadAttempts++;
-            logMessage(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
-            sdkLoaded = await loadSdk(url);
-            if (sdkLoaded) break;
-          }
-          if (!sdkLoaded || !window.Pi) {
-            throw new Error(`Pi SDK unavailable after ${sdkLoadAttempts} attempts`);
-          }
-        }
-
-        const isReady = await ensurePiSDKReady();
-        if (!isReady) {
-          throw new Error('Pi SDK failed to initialize');
-        }
-
-        const sandbox = new URLSearchParams(window.location.search).get('useSandbox') !== 'false';
-        logMessage(`Initializing Pi SDK with appId: marketmate, version: 2.0, sandbox: ${sandbox}`);
-        try {
-          await window.Pi.init({
-            version: '2.0',
-            sandbox: sandbox,
-            appId: 'marketmate'
-          });
-          logMessage('Pi.init succeeded');
-        } catch (err) {
-          throw new Error(`Pi SDK initialization failed: ${err.message}`);
-        }
-
-        // Skip if stored auth exists
-        const storedAuth = getStoredAuth();
-        if (storedAuth && storedAuth.accessToken) {
-          logMessage('Stored authentication found, skipping init auth');
-          errorMessage.textContent = 'Stored authentication found.';
-          loadingMessage.textContent = '';
-          return;
-        }
-
-        logMessage('Authenticating user with username scope...');
-        const authPromise = window.Pi.authenticate(
-          ['username'],
-          () => {
-            logMessage('Initial authentication cancelled by user');
-            errorMessage.textContent = 'Initial authentication cancelled by user.';
+          },
+          onReadyForServerCompletion: async (paymentId, txid) => {
+            logMessage(`Payment ready for completion: ${paymentId}, txid: ${txid}`);
+            try {
+              const response = await fetch('/api/payments/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paymentId, txid })
+              });
+              const result = await response.json();
+              if (!result.success) {
+                throw new Error(`Completion failed: ${result.error || 'Unknown error'}`);
+              }
+              logMessage(`Payment completed: ${JSON.stringify(result)}`);
+            } catch (err) {
+              logMessage(`Completion error: ${err.message}`, true);
+              throw err;
+            }
+          },
+          onCancel: () => {
+            logMessage('Payment cancelled');
+            errorMessage.textContent = 'Payment was cancelled.';
+            loadingMessage.textContent = '';
+          },
+          onError: (err) => {
+            logMessage(`Payment error: ${err.message}`, true);
+            errorMessage.textContent = `Payment failed: ${err.message}`;
             loadingMessage.textContent = '';
           }
-        );
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Initial authentication timed out after 10 seconds')), 10000);
-        });
-        const authResult = await Promise.race([authPromise, timeoutPromise]);
-        logMessage(`Initial authentication succeeded: ${JSON.stringify(authResult)}`);
-        storeAuthResult(authResult);
-        errorMessage.textContent = 'Initial authentication succeeded!';
+        };
+
+        await window.Pi.createPayment(paymentData, paymentCallbacks);
+        logMessage('Payment initiated');
+        errorMessage.textContent = 'Payment initiated! Check Pi wallet.';
       } catch (err) {
-        logMessage(`Initial authentication failed: ${err.message}`, true);
-        errorMessage.textContent = `Initial authentication failed: ${err.message}`;
-      } finally {
-        isInitializing = false;
-        loadingMessage.textContent = '';
+        logMessage(`Payment failed: ${err.message}, Stack: ${err.stack}`, true);
+        errorMessage.textContent = `Payment failed: ${err.message}`;
       }
+      loadingMessage.textContent = '';
     }
   </script>
 </body>
