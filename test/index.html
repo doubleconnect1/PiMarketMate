@@ -79,6 +79,8 @@
   <button onclick="testNetwork()">Test Network</button>
   <button onclick="testAppId()">Test App ID</button>
   <button onclick="checkStoredAuth()">Check Stored Auth</button>
+  <button onclick="clearStoredAuth()">Clear Stored Auth</button>
+  <button onclick="initAuthOnLoad()">Init Auth</button>
   <br>
   <label><input type="checkbox" id="debugMode" checked> Enable Debug Mode</label>
   <div id="loading-message"></div>
@@ -90,6 +92,7 @@
       'https://cdn.jsdelivr.net/npm/@pi-network/pi-sdk@2.0.0/dist/pi-sdk.min.js'
     ];
     let sdkLoadAttempts = 0;
+    let isInitializing = false;
 
     // Utility to log messages
     function logMessage(message, isError = false) {
@@ -174,6 +177,25 @@
         logMessage(`Failed to retrieve stored auth: ${err.message}`, true);
         return null;
       }
+    }
+
+    // Clear stored authentication
+    function clearStoredAuth() {
+      const errorMessage = document.getElementById('error-message');
+      const loadingMessage = document.getElementById('loading-message');
+      errorMessage.textContent = '';
+      loadingMessage.textContent = 'Clearing stored authentication...';
+      logMessage('Starting clearStoredAuth');
+
+      try {
+        localStorage.removeItem('piAuth');
+        logMessage('Stored authentication cleared');
+        errorMessage.textContent = 'Stored authentication cleared.';
+      } catch (err) {
+        logMessage(`Failed to clear stored auth: ${err.message}`, true);
+        errorMessage.textContent = `Failed to clear stored auth: ${err.message}`;
+      }
+      loadingMessage.textContent = '';
     }
 
     // Check stored authentication
@@ -605,6 +627,91 @@
       } catch (err) {
         errorMessage.textContent = `An error occurred: ${err.message}`;
         logMessage(`Error in initiatePayment: ${err.message}`, true);
+        loadingMessage.textContent = '';
+      }
+    }
+
+    // Trigger authentication manually
+    async function initAuthOnLoad() {
+      const errorMessage = document.getElementById('error-message');
+      const loadingMessage = document.getElementById('loading-message');
+      errorMessage.textContent = '';
+      loadingMessage.textContent = 'Initializing authentication...';
+      logMessage('Starting initAuthOnLoad');
+
+      if (isInitializing) {
+        logMessage('Initialization already in progress, skipping...');
+        errorMessage.textContent = 'Initialization already in progress.';
+        loadingMessage.textContent = '';
+        return;
+      }
+
+      isInitializing = true;
+
+      try {
+        if (!window.Pi) {
+          logMessage('window.Pi is undefined, attempting to load SDK...');
+          sdkLoadAttempts = 0;
+          let sdkLoaded = false;
+          for (const url of sdkUrls) {
+            sdkLoadAttempts++;
+            logMessage(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
+            sdkLoaded = await loadSdk(url);
+            if (sdkLoaded) break;
+          }
+          if (!sdkLoaded || !window.Pi) {
+            throw new Error(`Pi SDK unavailable after ${sdkLoadAttempts} attempts`);
+          }
+        }
+
+        const isReady = await ensurePiSDKReady();
+        if (!isReady) {
+          throw new Error('Pi SDK failed to initialize');
+        }
+
+        const sandbox = new URLSearchParams(window.location.search).get('useSandbox') !== 'false';
+        logMessage(`Initializing Pi SDK with appId: marketmate, version: 2.0, sandbox: ${sandbox}`);
+        try {
+          await window.Pi.init({
+            version: '2.0',
+            sandbox: sandbox,
+            appId: 'marketmate'
+          });
+          logMessage('Pi.init succeeded');
+        } catch (err) {
+          throw new Error(`Pi SDK initialization failed: ${err.message}`);
+        }
+
+        // Skip if stored auth exists
+        const storedAuth = getStoredAuth();
+        if (storedAuth && storedAuth.accessToken) {
+          logMessage('Stored authentication found, skipping init auth');
+          errorMessage.textContent = 'Stored authentication found.';
+          loadingMessage.textContent = '';
+          return;
+        }
+
+        logMessage('Authenticating user with username scope...');
+        const authPromise = window.Pi.authenticate(
+          ['username'],
+          () => {
+            logMessage('Initial authentication cancelled by user');
+            errorMessage.textContent = 'Initial authentication cancelled by user.';
+            loadingMessage.textContent = '';
+          }
+        );
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Initial authentication timed out after 10 seconds')), 10000);
+        });
+        const authResult = await Promise.race([authPromise, timeoutPromise]);
+        logMessage(`Initial authentication succeeded: ${JSON.stringify(authResult)}`);
+        storeAuthResult(authResult);
+        errorMessage.textContent = 'Initial authentication succeeded!';
+      } catch (err) {
+        logMessage(`Initial authentication failed: ${err.message}`, true);
+        errorMessage.textContent = `Initial authentication failed: ${err.message}`;
+      } finally {
+        isInitializing = false;
         loadingMessage.textContent = '';
       }
     }
