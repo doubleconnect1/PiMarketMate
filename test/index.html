@@ -74,6 +74,7 @@
   <br>
   <button onclick="initiatePayment()">Pay with Pi</button>
   <button onclick="testAuthentication()">Test Authentication</button>
+  <button onclick="testNetwork()">Test Network</button>
   <br>
   <label><input type="checkbox" id="debugMode" checked> Enable Debug Mode</label>
   <div id="loading-message"></div>
@@ -145,34 +146,24 @@
       return true;
     }
 
-    // Retryable authentication
-    async function authenticateWithRetry(maxRetries = 3) {
-      let attempt = 1;
-      while (attempt <= maxRetries) {
-        logMessage(`Authentication attempt ${attempt}/${maxRetries}`);
-        try {
-          const authPromise = window.Pi.authenticate(
-            ['payments'],
-            () => {
-              logMessage('Authentication cancelled by user');
-              throw new Error('Authentication cancelled by user');
-            }
-          );
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
-          });
-          const authResult = await Promise.race([authPromise, timeoutPromise]);
-          logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
-          return authResult;
-        } catch (err) {
-          logMessage(`Authentication attempt ${attempt} failed: ${err.message}`, true);
-          if (attempt === maxRetries) throw err;
-          const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
-          logMessage(`Retrying authentication after ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          attempt++;
-        }
+    // Test network connectivity
+    async function testNetwork() {
+      const errorMessage = document.getElementById('error-message');
+      const loadingMessage = document.getElementById('loading-message');
+      errorMessage.textContent = '';
+      loadingMessage.textContent = 'Testing network connectivity...';
+      logMessage('Starting testNetwork');
+
+      try {
+        logMessage(`Navigator online: ${navigator.onLine}`);
+        const response = await fetch('https://api.minepi.com', { method: 'GET', mode: 'no-cors' });
+        logMessage('Network test to https://api.minepi.com succeeded');
+        errorMessage.textContent = 'Network connectivity to Pi API is OK.';
+      } catch (err) {
+        logMessage(`Network test failed: ${err.message}`, true);
+        errorMessage.textContent = `Network test failed: ${err.message}`;
       }
+      loadingMessage.textContent = '';
     }
 
     // Test authentication
@@ -216,9 +207,25 @@
           throw new Error(`Pi SDK initialization failed: ${err.message}`);
         }
 
-        logMessage('Testing authentication with retries...');
-        const authResult = await authenticateWithRetry();
-        errorMessage.textContent = 'Authentication succeeded!';
+        logMessage('Authenticating user with payments scope...');
+        try {
+          const authPromise = window.Pi.authenticate(
+            ['payments'],
+            () => {
+              logMessage('Authentication cancelled by user');
+              errorMessage.textContent = 'Authentication cancelled by user.';
+              loadingMessage.textContent = '';
+            }
+          );
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
+          });
+          const authResult = await Promise.race([authPromise, timeoutPromise]);
+          logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
+          errorMessage.textContent = 'Authentication succeeded!';
+        } catch (err) {
+          throw new Error(`Authentication failed: ${err.message}`);
+        }
       } catch (err) {
         logMessage(`Test authentication failed: ${err.message}`, true);
         errorMessage.textContent = `Test authentication failed: ${err.message}`;
@@ -302,7 +309,18 @@
         if (!bypassAuth) {
           logMessage('Authenticating user with payments scope...');
           try {
-            const authResult = await authenticateWithRetry();
+            const authPromise = window.Pi.authenticate(
+              ['payments'],
+              () => {
+                logMessage('Authentication cancelled by user');
+                errorMessage.textContent = 'Authentication cancelled by user.';
+                loadingMessage.textContent = '';
+              }
+            );
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
+            });
+            const authResult = await Promise.race([authPromise, timeoutPromise]);
             logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
           } catch (err) {
             errorMessage.textContent = `Authentication failed: ${err.message}`;
