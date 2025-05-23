@@ -42,7 +42,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pi Market Mate - Sample Payment</title>
+  <title>Pi Market Mate - Diagnostic</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -74,6 +74,7 @@
   <h1>Pi Market Mate</h1>
   <p>Pay 0.01 Pi to test:</p>
   <button onclick="createPayment()">Pay 0.01 Pi</button>
+  <button onclick="testSdkInit()">Test SDK Init</button>
   <button onclick="checkStoredAuth()">Check Stored Auth</button>
   <button onclick="clearStoredAuth()">Clear Stored Auth</button>
   <button onclick="testNetwork()">Test Network</button>
@@ -97,19 +98,6 @@
       }
     }
 
-    // Initialize Pi SDK
-    async function initPiSDK() {
-      logMessage(`Initializing Pi SDK with appId: ${appId}, version: ${sdkVersion}, sandbox: ${sandbox}`);
-      try {
-        await window.Pi.init({ version: sdkVersion, sandbox: sandbox, appId: appId });
-        logMessage('Pi.init succeeded');
-        return true;
-      } catch (err) {
-        logMessage(`Pi.init failed: ${err.message}, Stack: ${err.stack}`, true);
-        throw err;
-      }
-    }
-
     // Ensure Pi SDK is ready
     async function ensurePiSDKReady() {
       logMessage('Checking if Pi SDK is ready...');
@@ -124,6 +112,47 @@
       }
       logMessage(`Pi SDK version: ${window.Pi.version || 'unknown'}`);
       return true;
+    }
+
+    // Initialize Pi SDK
+    async function initPiSDK() {
+      logMessage(`Initializing Pi SDK with appId: ${appId}, version: ${sdkVersion}, sandbox: ${sandbox}`);
+      try {
+        await window.Pi.init({ version: sdkVersion, sandbox: sandbox, appId: appId });
+        logMessage('Pi.init succeeded');
+        return true;
+      } catch (err) {
+        logMessage(`Pi.init failed: ${err.message}, Stack: ${err.stack}`, true);
+        throw err;
+      }
+    }
+
+    // Test SDK initialization
+    async function testSdkInit() {
+      const errorMessage = document.getElementById('error-message');
+      const loadingMessage = document.getElementById('loading-message');
+      errorMessage.textContent = '';
+      loadingMessage.textContent = 'Testing SDK initialization...';
+      logMessage('Starting testSdkInit');
+
+      try {
+        if (!window.Pi) {
+          logMessage('Pi SDK not loaded', true);
+          throw new Error('Pi SDK not loaded');
+        }
+
+        const isReady = await ensurePiSDKReady();
+        if (!isReady) {
+          throw new Error('Pi SDK failed to initialize');
+        }
+
+        await initPiSDK();
+        errorMessage.textContent = 'SDK initialization succeeded!';
+      } catch (err) {
+        logMessage(`SDK init failed: ${err.message}, Stack: ${err.stack}`, true);
+        errorMessage.textContent = `SDK init failed: ${err.message}`;
+      }
+      loadingMessage.textContent = '';
     }
 
     // Store authentication result
@@ -220,17 +249,12 @@
       try {
         if (!window.Pi) {
           logMessage('Pi SDK not loaded', true);
-          errorMessage.textContent = 'Pi SDK not loaded. Please ensure you\'re in the Pi Browser.';
-          loadingMessage.textContent = '';
-          return;
+          throw new Error('Pi SDK not loaded');
         }
 
         const isReady = await ensurePiSDKReady();
         if (!isReady) {
-          logMessage('Pi SDK not ready', true);
-          errorMessage.textContent = 'Pi SDK failed to initialize.';
-          loadingMessage.textContent = '';
-          return;
+          throw new Error('Pi SDK failed to initialize');
         }
 
         await initPiSDK();
@@ -244,7 +268,6 @@
             authResult = await Promise.race([
               window.Pi.authenticate(scopes, (payment) => {
                 logMessage(`Incomplete payment found: ${payment.identifier}`);
-                // Handle incomplete payment if needed
               }),
               new Promise((_, reject) => setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000))
             ]);
@@ -252,9 +275,7 @@
             storeAuthResult(authResult);
           } catch (err) {
             logMessage(`Authentication failed: ${err.message}, Stack: ${err.stack}`, true);
-            errorMessage.textContent = `Authentication failed: ${err.message}`;
-            loadingMessage.textContent = '';
-            return;
+            throw err;
           }
         }
 
