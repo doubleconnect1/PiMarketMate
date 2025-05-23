@@ -1,355 +1,304 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pi Market Mate - Diagnostic</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-      text-align: center;
-    }
-    button {
-      padding: 10px;
-      margin: 10px;
-      font-size: 16px;
-    }
-    #error-message, #loading-message, #username {
-      margin-top: 10px;
-    }
-    #error-message {
-      color: red;
-    }
-    #loading-message {
-      color: blue;
-    }
-    #username {
-      color: green;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi Market Mate - Test Payment</title>
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+       .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+       .input-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: bold;
+        }
+        input[type="number"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #piAmountDisplay {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #28a745;
+            font-weight: bold;
+        }
+       .message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #e9ecef;
+            color: #333;
+            font-size: 0.9em;
+        }
+       .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+       .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
 </head>
 <body>
-  <h1>Pi Market Mate</h1>
-  <p>Pay 0.01 Pi to test:</p>
-  <button onclick="createPayment()">Pay 0.01 Pi</button>
-  <button onclick="testSdkInit()">Test SDK Init</button>
-  <button onclick="checkStoredAuth()">Check Stored Auth</button>
-  <button onclick="clearStoredAuth()">Clear Stored Auth</button>
-  <button onclick="testNetwork()">Test Network</button>
-  <br>
-  <label><input type="checkbox" id="debugMode" checked> Enable Debug Mode</label>
-  <div id="username"></div>
-  <div id="loading-message"></div>
-  <div id="error-message"></div>
+    <div class="container">
+        <h1>Pi Market Mate</h1>
+        <div class="input-group">
+            <label for="fiatPrice">Enter Fiat Price (USD):</label>
+            <input type="number" id="fiatPrice" value="1.00" step="0.01" min="0.01">
+        </div>
+        <div id="piAmountDisplay">
+            Calculated Pi: <span id="calculatedPi">0.00</span> π
+        </div>
+        <button id="payWithPiButton">Pay with Pi</button>
+        <div id="statusMessage" class="message">
+            Please ensure you are in the Pi Browser.
+        </div>
+    </div>
 
-  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
-  <script>
-    // Configuration
-    const appId = 'marketmate';
-    const sdkVersion = '2.0';
-    const sandbox = new URLSearchParams(window.location.search).get('useSandbox') !== 'false';
+    <script>
+        // --- Configuration ---
+        const PI_PRICE_USD = 30.00; // Placeholder: 1 Pi = $30 USD. Replace with dynamic fetching in production.
+        const APP_MEMO = "Purchase on Pi Market Mate"; // Memo for the Pi payment [9, 15]
+        const APP_METADATA = { appName: "PiMarketMate", item: "Product/Service" }; // Your app's internal metadata [9, 15]
 
-    // Utility to log messages
-    function logMessage(message, isError = false) {
-      if (document.getElementById('debugMode').checked) {
-        console[isError ? 'error' : 'log'](`[${new Date().toISOString()}] ${message}`);
-      }
-    }
+        // --- DOM Elements ---
+        const fiatPriceInput = document.getElementById('fiatPrice');
+        const calculatedPiSpan = document.getElementById('calculatedPi');
+        const payWithPiButton = document.getElementById('payWithPiButton');
+        const statusMessageDiv = document.getElementById('statusMessage');
 
-    // Ensure Pi SDK is ready
-    async function ensurePiSDKReady() {
-      logMessage('Checking if Pi SDK is ready...');
-      const timeoutMs = 30000;
-      const startTime = Date.now();
-      while (!window.Pi && (Date.now() - startTime) < timeoutMs) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      if (!window.Pi) {
-        logMessage(`Pi SDK initialization timed out after ${timeoutMs} ms`, true);
-        return false;
-      }
-      logMessage(`Pi SDK version: ${window.Pi.version || 'unknown'}`);
-      return true;
-    }
+        let isAuthenticated = false;
+        let currentAuth; // To store the authentication object
 
-    // Initialize Pi SDK
-    async function initPiSDK() {
-      logMessage(`Initializing Pi SDK with appId: ${appId}, version: ${sdkVersion}, sandbox: ${sandbox}`);
-      try {
-        await window.Pi.init({ version: sdkVersion, sandbox: sandbox, appId: appId });
-        logMessage('Pi.init succeeded');
-        return true;
-      } catch (err) {
-        logMessage(`Pi.init failed: ${err.message}, Stack: ${err.stack}`, true);
-        throw err;
-      }
-    }
-
-    // Test SDK initialization
-    async function testSdkInit() {
-      const errorMessage = document.getElementById('error-message');
-      const loadingMessage = document.getElementById('loading-message');
-      errorMessage.textContent = '';
-      loadingMessage.textContent = 'Testing SDK initialization...';
-      logMessage('Starting testSdkInit');
-
-      try {
-        if (!window.Pi) {
-          logMessage('Pi SDK not loaded', true);
-          throw new Error('Pi SDK not loaded');
+        // --- Helper Functions ---
+        function updateStatus(message, type = 'info') {
+            statusMessageDiv.textContent = message;
+            statusMessageDiv.className = `message ${type}`;
         }
 
-        const isReady = await ensurePiSDKReady();
-        if (!isReady) {
-          throw new Error('Pi SDK failed to initialize');
+        function calculatePiAmount() {
+            const fiatValue = parseFloat(fiatPriceInput.value);
+            if (isNaN(fiatValue) |
+| fiatValue <= 0) {
+                calculatedPiSpan.textContent = '0.00';
+                return 0;
+            }
+            const piAmount = fiatValue / PI_PRICE_USD;
+            calculatedPiSpan.textContent = piAmount.toFixed(5); // Display with more precision
+            return piAmount;
         }
 
-        await initPiSDK();
-        errorMessage.textContent = 'SDK initialization succeeded!';
-      } catch (err) {
-        logMessage(`SDK init failed: ${err.message}, Stack: ${err.stack}`, true);
-        errorMessage.textContent = `SDK init failed: ${err.message}`;
-      }
-      loadingMessage.textContent = '';
-    }
+        // --- Pi SDK Callbacks ---
 
-    // Store authentication result
-    function storeAuthResult(authResult) {
-      try {
-        localStorage.setItem('piAuth', JSON.stringify(authResult));
-        logMessage(`Stored auth result: ${JSON.stringify(authResult)}`);
-      } catch (err) {
-        logMessage(`Failed to store auth result: ${err.message}`, true);
-      }
-    }
-
-    // Retrieve stored authentication
-    function getStoredAuth() {
-      try {
-        const auth = localStorage.getItem('piAuth');
-        if (auth) {
-          logMessage(`Retrieved stored auth: ${auth}`);
-          return JSON.parse(auth);
-        }
-        logMessage('No stored auth found');
-        return null;
-      } catch (err) {
-        logMessage(`Failed to retrieve stored auth: ${err.message}`, true);
-        return null;
-      }
-    }
-
-    // Clear stored authentication
-    function clearStoredAuth() {
-      const errorMessage = document.getElementById('error-message');
-      const loadingMessage = document.getElementById('loading-message');
-      errorMessage.textContent = '';
-      loadingMessage.textContent = 'Clearing stored authentication...';
-      logMessage('Starting clearStoredAuth');
-
-      try {
-        localStorage.removeItem('piAuth');
-        logMessage('Stored authentication cleared');
-        errorMessage.textContent = 'Stored authentication cleared.';
-      } catch (err) {
-        logMessage(`Failed to clear stored auth: ${err.message}`, true);
-        errorMessage.textContent = `Failed to clear stored auth: ${err.message}`;
-      }
-      loadingMessage.textContent = '';
-    }
-
-    // Check stored authentication
-    function checkStoredAuth() {
-      const errorMessage = document.getElementById('error-message');
-      const loadingMessage = document.getElementById('loading-message');
-      errorMessage.textContent = '';
-      loadingMessage.textContent = 'Checking stored authentication...';
-      logMessage('Starting checkStoredAuth');
-
-      const auth = getStoredAuth();
-      if (auth) {
-        errorMessage.textContent = `Stored auth: UID=${auth.user?.uid}, Username=${auth.user?.username || 'N/A'}, Token=${auth.accessToken?.substring(0, 10)}...`;
-      } else {
-        errorMessage.textContent = 'No stored authentication found.';
-      }
-      loadingMessage.textContent = '';
-    }
-
-    // Test network connectivity
-    async function testNetwork() {
-      const errorMessage = document.getElementById('error-message');
-      const loadingMessage = document.getElementById('loading-message');
-      errorMessage.textContent = '';
-      loadingMessage.textContent = 'Testing network connectivity...';
-      logMessage('Starting testNetwork');
-
-      try {
-        logMessage(`Navigator online: ${navigator.onLine}`);
-        const response = await fetch('https://api.minepi.com', { method: 'GET', mode: 'no-cors' });
-        logMessage('Network test to https://api.minepi.com succeeded');
-        errorMessage.textContent = 'Network connectivity to Pi API is OK.';
-      } catch (err) {
-        logMessage(`Network test failed: ${err.message}`, true);
-        errorMessage.textContent = `Network test failed: ${err.message}`;
-      }
-      loadingMessage.textContent = '';
-    }
-
-    // Authenticate and create payment
-    async function createPayment() {
-      const errorMessage = document.getElementById('error-message');
-      const loadingMessage = document.getElementById('loading-message');
-      const usernameDisplay = document.getElementById('username');
-      errorMessage.textContent = '';
-      loadingMessage.textContent = 'Processing payment...';
-      logMessage('Starting createPayment');
-
-      try {
-        if (!window.Pi) {
-          logMessage('Pi SDK not loaded', true);
-          throw new Error('Pi SDK not loaded');
+        // This callback is called by the Pi SDK if any pending or incomplete payments are detected [3, 15]
+        function onIncompletePaymentFound(payment) {
+            console.warn('Incomplete payment found:', payment);
+            updateStatus('An incomplete payment was found. Please complete or cancel it in your Pi Wallet.', 'error');
+            // IMPORTANT: In a real application, you would send this paymentId to your backend
+            // to either complete or cancel the payment based on your business logic.
+            // Example: fetch('/api/payments/handle-incomplete', { method: 'POST', body: JSON.stringify({ paymentId: payment.identifier, txid: payment.transaction?.txid }) });
         }
 
-        const isReady = await ensurePiSDKReady();
-        if (!isReady) {
-          throw new Error('Pi SDK failed to initialize');
-        }
+        // This callback is called when the payment ID is ready for server approval [3, 9, 15]
+        function onReadyForServerApproval(paymentId) {
+            console.log('Payment initiated and ready for server approval:', paymentId);
+            updateStatus('Payment initiated. Waiting for server approval...', 'info');
 
-        await initPiSDK();
-
-        // Check stored authentication
-        let authResult = getStoredAuth();
-        if (!authResult || !authResult.accessToken) {
-          logMessage('No valid stored authentication, authenticating user...');
-          const scopes = ['payments', 'username'];
-          try {
-            authResult = await Promise.race([
-              window.Pi.authenticate(scopes, (payment) => {
-                logMessage(`Incomplete payment found: ${payment.identifier}`);
-              }),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000))
-            ]);
-            logMessage(`Authentication succeeded: ${JSON.stringify(authResult)}`);
-            storeAuthResult(authResult);
-          } catch (err) {
-            logMessage(`Authentication failed: ${err.message}, Stack: ${err.stack}`, true);
-            throw err;
-          }
-        }
-
-        // Display username
-        if (authResult.user && authResult.user.username) {
-          usernameDisplay.textContent = `Hello, ${authResult.user.username}!`;
-          logMessage(`Displayed username: ${authResult.user.username}`);
-        }
-
-        // Create payment
-        logMessage('Creating payment for 0.01 Pi...');
-        const paymentData = {
-          amount: 0.01,
-          memo: 'Test payment for Pi Market Mate',
-          metadata: { orderId: `order_${Date.now()}` }
-        };
-        const paymentCallbacks = {
-          onReadyForServerApproval: async (paymentId) => {
-            logMessage(`Payment ready for approval: ${paymentId}`);
-            try {
-              const response = await fetch('/api/payments/approve', {
+            // IMPORTANT: Send paymentId to your backend for server-side approval.
+            // Your backend must then call the Pi Platform API: POST /v2/payments/{payment_id}/approve [3, 4, 6]
+            fetch('/api/payments/approve', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paymentId })
-              });
-              const result = await response.json();
-              if (!result.success) {
-                throw new Error(`Approval failed: ${result.error || 'Unknown error'}`);
-              }
-              logMessage(`Payment approved: ${JSON.stringify(result)}`);
-            } catch (err) {
-              logMessage(`Approval error: ${err.message}`, true);
-              throw err;
-            }
-          },
-          onReadyForServerCompletion: async (paymentId, txid) => {
-            logMessage(`Payment ready for completion: ${paymentId}, txid: ${txid}`);
-            try {
-              const response = await fetch('/api/payments/complete', {
+                body: JSON.stringify({ paymentId: paymentId })
+            })
+           .then(response => response.json())
+           .then(data => {
+                if (data.success) {
+                    console.log('Server approval response:', data);
+                    updateStatus('Server approved payment. Please confirm in your Pi Wallet.', 'info');
+                } else {
+                    console.error('Server approval failed:', data.error);
+                    updateStatus('Server approval failed. Please try again.', 'error');
+                }
+            })
+           .catch(error => {
+                console.error('Error sending approval to backend:', error);
+                updateStatus('Network error during server approval. Please check console.', 'error');
+            });
+        }
+
+        // This callback is called after the blockchain transaction has been submitted [3, 9, 15]
+        function onReadyForServerCompletion(paymentId, txid) {
+            console.log('Payment transaction submitted to blockchain:', paymentId, txid);
+            updateStatus('Payment confirmed on blockchain. Waiting for server completion...', 'info');
+
+            // IMPORTANT: Send paymentId and txid to your backend for server-side completion.
+            // Your backend must then call the Pi Platform API: POST /v2/payments/{payment_id}/complete [3, 4, 6]
+            fetch('/api/payments/complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paymentId, txid })
-              });
-              const result = await response.json();
-              if (!result.success) {
-                throw new Error(`Completion failed: ${result.error || 'Unknown error'}`);
-              }
-              logMessage(`Payment completed: ${JSON.stringify(result)}`);
-            } catch (err) {
-              logMessage(`Completion error: ${err.message}`, true);
-              throw err;
-            }
-          },
-          onCancel: () => {
-            logMessage('Payment cancelled');
-            errorMessage.textContent = 'Payment was cancelled.';
-            loadingMessage.textContent = '';
-          },
-          onError: (err) => {
-            logMessage(`Payment error: ${err.message}`, true);
-            errorMessage.textContent = `Payment failed: ${err.message}`;
-            loadingMessage.textContent = '';
-          }
-        };
+                body: JSON.stringify({ paymentId: paymentId, txid: txid })
+            })
+           .then(response => response.json())
+           .then(data => {
+                if (data.success) {
+                    console.log('Server completion response:', data);
+                    updateStatus('Payment successfully completed and product delivered!', 'success');
+                    // Here you would typically update your UI to reflect the successful purchase
+                } else {
+                    console.error('Server completion failed:', data.error);
+                    updateStatus('Server completion failed. Please contact support.', 'error');
+                }
+            })
+           .catch(error => {
+                console.error('Error sending completion to backend:', error);
+                updateStatus('Network error during server completion. Please check console.', 'error');
+            });
+        }
 
-        await window.Pi.createPayment(paymentData, paymentCallbacks);
-        logMessage('Payment initiated');
-        errorMessage.textContent = 'Payment initiated! Check Pi wallet.';
-      } catch (err) {
-        logMessage(`Payment failed: ${err.message}, Stack: ${err.stack}`, true);
-        errorMessage.textContent = `Payment failed: ${err.message}`;
-      }
-      loadingMessage.textContent = '';
-    }
-  </script>
+        // This callback is called if the payment process is cancelled [9, 15]
+        function onCancel(paymentId) {
+            console.log('Payment cancelled by user or programmatically:', paymentId);
+            updateStatus('Payment cancelled by user.', 'error');
+        }
+
+        // This general error callback is invoked if any unhandled error occurs during the payment process [9]
+        function onError(error, payment) {
+            console.error('An error occurred during payment:', error, payment);
+            updateStatus(`Payment error: ${error.message |
+| error}. Please try again.`, 'error');
+        }
+
+        // --- Pi SDK Initialization and Authentication ---
+        function initPiSDK() {
+            try {
+                // Initialize the Pi SDK in sandbox mode for Testnet [3]
+                Pi.init({ version: "2.0", sandbox: true });
+                console.log('Pi SDK initialized.');
+                updateStatus('Pi SDK initialized. Authenticating user...', 'info');
+
+                // Authenticate the user and request 'payments' scope [3, 9]
+                // This is what triggers the consent pop-up for payment permissions if not already granted.
+                Pi.authenticate(['payments', 'username'], onIncompletePaymentFound)
+                   .then(function(auth) {
+                        console.log(`Authentication successful! Hi there, ${auth.user.username}!`);
+                        isAuthenticated = true;
+                        currentAuth = auth;
+                        updateStatus(`Welcome, ${auth.user.username}! Ready to pay.`, 'success');
+                        payWithPiButton.disabled = false; // Enable button after authentication
+                        // IMPORTANT: Send auth.accessToken to your backend for server-side verification using /v2/me endpoint [16]
+                        // This verified UID should be used for all persistent user records [16]
+                    })
+                   .catch(function(error) {
+                        console.error("Authentication error occurred:", error);
+                        isAuthenticated = false;
+                        payWithPiButton.disabled = true;
+                        updateStatus(`Authentication failed: ${error.message}. Please ensure you are in the Pi Browser and try again.`, 'error');
+                    });
+            } catch (e) {
+                console.error("Pi SDK not found or failed to initialize. Are you in the Pi Browser?", e);
+                updateStatus("Pi SDK not found. Please open this page in the Pi Browser.", 'error');
+                payWithPiButton.disabled = true;
+            }
+        }
+
+        // --- Event Listeners ---
+        fiatPriceInput.addEventListener('input', calculatePiAmount);
+
+        payWithPiButton.addEventListener('click', function() {
+            if (!isAuthenticated) {
+                updateStatus('Please authenticate first. Reload the page in Pi Browser.', 'error');
+                return;
+            }
+
+            const piAmount = calculatePiAmount();
+            if (piAmount <= 0) {
+                updateStatus('Please enter a valid fiat price.', 'error');
+                return;
+            }
+
+            console.log(`Attempting to create payment for ${piAmount.toFixed(5)} Pi.`);
+            updateStatus('Initiating payment...', 'info');
+
+            // Initiate the payment [9]
+            Pi.createPayment({
+                amount: piAmount,
+                memo: APP_MEMO,
+                metadata: APP_METADATA
+            }, {
+                onReadyForServerApproval: onReadyForServerApproval,
+                onReadyForServerCompletion: onReadyForServerCompletion,
+                onCancel: onCancel,
+                onError: onError
+            })
+           .then(function(payment) {
+                console.log('Payment object received from Pi.createPayment:', payment);
+                // This 'then' block indicates the payment request was successfully sent to Pi servers.
+                // Further steps are handled by the callbacks.
+            })
+           .catch(function(error) {
+                console.error('Error calling Pi.createPayment:', error);
+                updateStatus(`Failed to initiate payment: ${error.message}.`, 'error');
+            });
+        });
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            calculatePiAmount(); // Calculate initial Pi amount
+            payWithPiButton.disabled = true; // Disable button until authenticated
+            initPiSDK(); // Initialize Pi SDK and attempt authentication
+        });
+    </script>
 </body>
 </html>
