@@ -87,6 +87,7 @@
         const loadPromise = new Promise((resolve, reject) => {
           script.onload = () => {
             console.log(`SDK loaded successfully from: ${url}`);
+            console.log('Pi SDK version:', window.Pi ? (window.Pi.version || 'unknown') : 'not loaded');
             resolve(true);
           };
           script.onerror = () => {
@@ -174,9 +175,9 @@
         }
 
         // Initialize Pi SDK
-        console.log('Initializing Pi SDK with appId: marketmate');
+        console.log('Initializing Pi SDK with appId: marketmate, version: 2.0');
         await window.Pi.init({
-          version: '1.0',
+          version: '2.0',
           sandbox: true,
           appId: 'marketmate'
         }).catch(err => {
