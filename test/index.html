@@ -18,7 +18,7 @@
             padding: 20px;
             box-sizing: border-box;
         }
-       .container {
+      .container {
             background-color: #ffffff;
             padding: 30px;
             border-radius: 10px;
@@ -31,7 +31,7 @@
             color: #333;
             margin-bottom: 20px;
         }
-       .input-group {
+      .input-group {
             margin-bottom: 15px;
             text-align: left;
         }
@@ -70,7 +70,7 @@
             color: #28a745;
             font-weight: bold;
         }
-       .message {
+      .message {
             margin-top: 20px;
             padding: 10px;
             border-radius: 5px;
@@ -78,12 +78,12 @@
             color: #333;
             font-size: 0.9em;
         }
-       .error {
+      .error {
             background-color: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
-       .success {
+      .success {
             background-color: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
@@ -102,15 +102,15 @@
         </div>
         <button id="payWithPiButton">Pay with Pi</button>
         <div id="statusMessage" class="message">
-            Please ensure you are in the Pi Browser.
+            Initializing...
         </div>
     </div>
 
     <script>
         // --- Configuration ---
         const PI_PRICE_USD = 30.00; // Placeholder: 1 Pi = $30 USD. Replace with dynamic fetching in production.
-        const APP_MEMO = "Purchase on Pi Market Mate"; // Memo for the Pi payment [9, 15]
-        const APP_METADATA = { appName: "PiMarketMate", item: "Product/Service" }; // Your app's internal metadata [9, 15]
+        const APP_MEMO = "Purchase on Pi Market Mate"; // Memo for the Pi payment [1, 2]
+        const APP_METADATA = { appName: "PiMarketMate", item: "Product/Service" }; // Your app's internal metadata [1, 2]
 
         // --- DOM Elements ---
         const fiatPriceInput = document.getElementById('fiatPrice');
@@ -141,7 +141,7 @@
 
         // --- Pi SDK Callbacks ---
 
-        // This callback is called by the Pi SDK if any pending or incomplete payments are detected [3, 15]
+        // This callback is called by the Pi SDK if any pending or incomplete payments are detected [3, 1]
         function onIncompletePaymentFound(payment) {
             console.warn('Incomplete payment found:', payment);
             updateStatus('An incomplete payment was found. Please complete or cancel it in your Pi Wallet.', 'error');
@@ -150,20 +150,20 @@
             // Example: fetch('/api/payments/handle-incomplete', { method: 'POST', body: JSON.stringify({ paymentId: payment.identifier, txid: payment.transaction?.txid }) });
         }
 
-        // This callback is called when the payment ID is ready for server approval [3, 9, 15]
+        // This callback is called when the payment ID is ready for server approval [3, 1, 2]
         function onReadyForServerApproval(paymentId) {
             console.log('Payment initiated and ready for server approval:', paymentId);
             updateStatus('Payment initiated. Waiting for server approval...', 'info');
 
             // IMPORTANT: Send paymentId to your backend for server-side approval.
-            // Your backend must then call the Pi Platform API: POST /v2/payments/{payment_id}/approve [3, 4, 6]
+            // Your backend must then call the Pi Platform API: POST /v2/payments/{payment_id}/approve [3, 4]
             fetch('/api/payments/approve', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paymentId: paymentId })
             })
-           .then(response => response.json())
-           .then(data => {
+          .then(response => response.json())
+          .then(data => {
                 if (data.success) {
                     console.log('Server approval response:', data);
                     updateStatus('Server approved payment. Please confirm in your Pi Wallet.', 'info');
@@ -172,26 +172,26 @@
                     updateStatus('Server approval failed. Please try again.', 'error');
                 }
             })
-           .catch(error => {
+          .catch(error => {
                 console.error('Error sending approval to backend:', error);
                 updateStatus('Network error during server approval. Please check console.', 'error');
             });
         }
 
-        // This callback is called after the blockchain transaction has been submitted [3, 9, 15]
+        // This callback is called after the blockchain transaction has been submitted [3, 1, 2]
         function onReadyForServerCompletion(paymentId, txid) {
             console.log('Payment transaction submitted to blockchain:', paymentId, txid);
             updateStatus('Payment confirmed on blockchain. Waiting for server completion...', 'info');
 
             // IMPORTANT: Send paymentId and txid to your backend for server-side completion.
-            // Your backend must then call the Pi Platform API: POST /v2/payments/{payment_id}/complete [3, 4, 6]
+            // Your backend must then call the Pi Platform API: POST /v2/payments/{payment_id}/complete [3, 4]
             fetch('/api/payments/complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ paymentId: paymentId, txid: txid })
             })
-           .then(response => response.json())
-           .then(data => {
+          .then(response => response.json())
+          .then(data => {
                 if (data.success) {
                     console.log('Server completion response:', data);
                     updateStatus('Payment successfully completed and product delivered!', 'success');
@@ -201,19 +201,19 @@
                     updateStatus('Server completion failed. Please contact support.', 'error');
                 }
             })
-           .catch(error => {
+          .catch(error => {
                 console.error('Error sending completion to backend:', error);
                 updateStatus('Network error during server completion. Please check console.', 'error');
             });
         }
 
-        // This callback is called if the payment process is cancelled [9, 15]
+        // This callback is called if the payment process is cancelled [1, 2]
         function onCancel(paymentId) {
             console.log('Payment cancelled by user or programmatically:', paymentId);
             updateStatus('Payment cancelled by user.', 'error');
         }
 
-        // This general error callback is invoked if any unhandled error occurs during the payment process [9]
+        // This general error callback is invoked if any unhandled error occurs during the payment process [1]
         function onError(error, payment) {
             console.error('An error occurred during payment:', error, payment);
             updateStatus(`Payment error: ${error.message |
@@ -222,33 +222,40 @@
 
         // --- Pi SDK Initialization and Authentication ---
         function initPiSDK() {
+            // Check if Pi object is available (meaning SDK script loaded)
+            if (typeof Pi === 'undefined') {
+                updateStatus("Pi SDK not found. Please ensure you are in the Pi Browser and the SDK script loads correctly.", 'error');
+                payWithPiButton.disabled = true;
+                return;
+            }
+
             try {
                 // Initialize the Pi SDK in sandbox mode for Testnet [3]
                 Pi.init({ version: "2.0", sandbox: true });
                 console.log('Pi SDK initialized.');
                 updateStatus('Pi SDK initialized. Authenticating user...', 'info');
 
-                // Authenticate the user and request 'payments' scope [3, 9]
+                // Authenticate the user and request 'payments' scope [3, 1]
                 // This is what triggers the consent pop-up for payment permissions if not already granted.
                 Pi.authenticate(['payments', 'username'], onIncompletePaymentFound)
-                   .then(function(auth) {
+                  .then(function(auth) {
                         console.log(`Authentication successful! Hi there, ${auth.user.username}!`);
                         isAuthenticated = true;
                         currentAuth = auth;
                         updateStatus(`Welcome, ${auth.user.username}! Ready to pay.`, 'success');
                         payWithPiButton.disabled = false; // Enable button after authentication
-                        // IMPORTANT: Send auth.accessToken to your backend for server-side verification using /v2/me endpoint [16]
-                        // This verified UID should be used for all persistent user records [16]
+                        // IMPORTANT: Send auth.accessToken to your backend for server-side verification using /v2/me endpoint [5]
+                        // This verified UID should be used for all persistent user records [5]
                     })
-                   .catch(function(error) {
+                  .catch(function(error) {
                         console.error("Authentication error occurred:", error);
                         isAuthenticated = false;
                         payWithPiButton.disabled = true;
                         updateStatus(`Authentication failed: ${error.message}. Please ensure you are in the Pi Browser and try again.`, 'error');
                     });
             } catch (e) {
-                console.error("Pi SDK not found or failed to initialize. Are you in the Pi Browser?", e);
-                updateStatus("Pi SDK not found. Please open this page in the Pi Browser.", 'error');
+                console.error("Error during Pi SDK initialization or authentication:", e);
+                updateStatus("An unexpected error occurred during SDK setup. Please check console.", 'error');
                 payWithPiButton.disabled = true;
             }
         }
@@ -271,7 +278,7 @@
             console.log(`Attempting to create payment for ${piAmount.toFixed(5)} Pi.`);
             updateStatus('Initiating payment...', 'info');
 
-            // Initiate the payment [9]
+            // Initiate the payment [1]
             Pi.createPayment({
                 amount: piAmount,
                 memo: APP_MEMO,
@@ -282,12 +289,12 @@
                 onCancel: onCancel,
                 onError: onError
             })
-           .then(function(payment) {
+          .then(function(payment) {
                 console.log('Payment object received from Pi.createPayment:', payment);
                 // This 'then' block indicates the payment request was successfully sent to Pi servers.
                 // Further steps are handled by the callbacks.
             })
-           .catch(function(error) {
+          .catch(function(error) {
                 console.error('Error calling Pi.createPayment:', error);
                 updateStatus(`Failed to initiate payment: ${error.message}.`, 'error');
             });
@@ -295,6 +302,8 @@
 
         // --- Initial Load ---
         document.addEventListener('DOMContentLoaded', () => {
+            // Initial status message to indicate script is running
+            updateStatus('JavaScript loaded. Attempting Pi SDK initialization...');
             calculatePiAmount(); // Calculate initial Pi amount
             payWithPiButton.disabled = true; // Disable button until authenticated
             initPiSDK(); // Initialize Pi SDK and attempt authentication
