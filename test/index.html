@@ -89,7 +89,7 @@
     // Utility to log messages
     function logMessage(message, isError = false) {
       if (document.getElementById('debugMode').checked) {
-        console[isError ? 'error' : 'log'](message);
+        console[isError ? 'error' : 'log'](`[${new Date().toISOString()}] ${message}`);
       }
     }
 
@@ -145,6 +145,36 @@
       return true;
     }
 
+    // Retryable authentication
+    async function authenticateWithRetry(maxRetries = 3) {
+      let attempt = 1;
+      while (attempt <= maxRetries) {
+        logMessage(`Authentication attempt ${attempt}/${maxRetries}`);
+        try {
+          const authPromise = window.Pi.authenticate(
+            ['payments'],
+            () => {
+              logMessage('Authentication cancelled by user');
+              throw new Error('Authentication cancelled by user');
+            }
+          );
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
+          });
+          const authResult = await Promise.race([authPromise, timeoutPromise]);
+          logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
+          return authResult;
+        } catch (err) {
+          logMessage(`Authentication attempt ${attempt} failed: ${err.message}`, true);
+          if (attempt === maxRetries) throw err;
+          const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
+          logMessage(`Retrying authentication after ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          attempt++;
+        }
+      }
+    }
+
     // Test authentication
     async function testAuthentication() {
       const errorMessage = document.getElementById('error-message');
@@ -156,8 +186,8 @@
       try {
         if (!window.Pi) {
           logMessage('window.Pi is undefined, attempting to load SDK...');
-          let sdkLoaded = false;
           sdkLoadAttempts = 0;
+          let sdkLoaded = false;
           for (const url of sdkUrls) {
             sdkLoadAttempts++;
             logMessage(`SDK load attempt ${sdkLoadAttempts} with URL: ${url}`);
@@ -186,20 +216,8 @@
           throw new Error(`Pi SDK initialization failed: ${err.message}`);
         }
 
-        logMessage('Authenticating user with payments scope...');
-        const authPromise = window.Pi.authenticate(
-          ['payments'],
-          () => {
-            logMessage('Authentication cancelled by user');
-            errorMessage.textContent = 'Authentication cancelled by user.';
-            loadingMessage.textContent = '';
-          }
-        );
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
-        });
-        const authResult = await Promise.race([authPromise, timeoutPromise]);
-        logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
+        logMessage('Testing authentication with retries...');
+        const authResult = await authenticateWithRetry();
         errorMessage.textContent = 'Authentication succeeded!';
       } catch (err) {
         logMessage(`Test authentication failed: ${err.message}`, true);
@@ -214,12 +232,11 @@
       const amount = parseFloat(amountInput.value);
       const errorMessage = document.getElementById('error-message');
       const loadingMessage = document.getElementById('loading-message');
-      const bypassInit = new URLSearchParams(window.location.search).get('bypassInit') === 'true';
       const bypassAuth = new URLSearchParams(window.location.search).get('bypassAuth') === 'true';
 
       errorMessage.textContent = '';
       loadingMessage.textContent = 'Processing payment...';
-      logMessage(`Starting initiatePayment with amount: ${amount}, bypassInit: ${bypassInit}, bypassAuth: ${bypassAuth}`);
+      logMessage(`Starting initiatePayment with amount: ${amount}, bypassAuth: ${bypassAuth}`);
 
       try {
         if (!amount || amount <= 0) {
@@ -266,41 +283,26 @@
         }
 
         // Initialize Pi SDK
-        if (!bypassInit) {
-          logMessage('Initializing Pi SDK with appId: marketmate, version: 2.0');
-          try {
-            await window.Pi.init({
-              version: '2.0',
-              sandbox: true,
-              appId: 'marketmate'
-            });
-            logMessage('Pi.init succeeded');
-          } catch (err) {
-            errorMessage.textContent = `Pi SDK initialization failed: ${err.message}`;
-            logMessage(`Pi.init failed: ${err.message}`, true);
-            loadingMessage.textContent = '';
-            return;
-          }
-        } else {
-          logMessage('Bypassing Pi.init for testing...');
+        logMessage('Initializing Pi SDK with appId: marketmate, version: 2.0');
+        try {
+          await window.Pi.init({
+            version: '2.0',
+            sandbox: true,
+            appId: 'marketmate'
+          });
+          logMessage('Pi.init succeeded');
+        } catch (err) {
+          errorMessage.textContent = `Pi SDK initialization failed: ${err.message}`;
+          logMessage(`Pi.init failed: ${err.message}`, true);
+          loadingMessage.textContent = '';
+          return;
         }
 
         // Authenticate user
         if (!bypassAuth) {
           logMessage('Authenticating user with payments scope...');
           try {
-            const authPromise = window.Pi.authenticate(
-              ['payments'],
-              () => {
-                logMessage('Authentication cancelled by user');
-                errorMessage.textContent = 'Authentication cancelled by user.';
-                loadingMessage.textContent = '';
-              }
-            );
-            const timeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Authentication timed out after 10 seconds')), 10000);
-            });
-            const authResult = await Promise.race([authPromise, timeoutPromise]);
+            const authResult = await authenticateWithRetry();
             logMessage(`User authenticated: ${JSON.stringify(authResult)}`);
           } catch (err) {
             errorMessage.textContent = `Authentication failed: ${err.message}`;
@@ -375,11 +377,11 @@
           loadingMessage.textContent = '';
           return;
         }
-      } catch (error) {
-        errorMessage.textContent = `An error occurred: ${error.message}`;
-        logMessage(`Error in initiatePayment: ${error.message}`, true);
+      } catch (err) {
+        errorMessage.textContent = `An error occurred: ${err.message}`;
+        logMessage(`Error in initiatePayment: ${err.message}`, true);
+        loadingMessage.textContent = '';
       }
-      loadingMessage.textContent = '';
     }
   </script>
 </body>
